@@ -5,7 +5,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from utils import colored, print_banner, find_free_port, load_config
 
-
 class ChatServer:
     def __init__(self, host='0.0.0.0', port=None):
         self.host = host
@@ -15,29 +14,26 @@ class ChatServer:
         self.server_running = True
 
     def broadcast(self, message, exclude_client=None):
-        """Send a message to all clients except the sender."""
         for client, nickname in list(self.clients.items()):
             if client != exclude_client:
                 try:
-                    client.send(message.encode('ascii'))
+                    client.send(message.encode('utf-8'))
                 except Exception as e:
                     logging.error(f"Error sending message to {nickname}: {e}")
                     self.remove_client(client)
 
     def remove_client(self, client):
-        """Remove a disconnected client."""
         if client in self.clients:
             nickname = self.clients.pop(client)
             client.close()
-            self.broadcast(colored(f'{nickname} left the chat!', 'red'))
+            self.broadcast(colored(f'{nickname} left StreamLine!', 'red'))
             logging.info(f"{nickname} disconnected.")
 
     def handle_client(self, client):
-        """Handle incoming messages from a client."""
         nickname = self.clients[client]
         while True:
             try:
-                message = client.recv(1024).decode('ascii')
+                message = client.recv(1024).decode('utf-8')
                 if not message:
                     break
                 self.broadcast(colored(f"{nickname}: {message}", 'green'), client)
@@ -46,47 +42,32 @@ class ChatServer:
                 break
         self.remove_client(client)
 
-    def handle_server_input(self):
-        """Allow the server to participate in chat."""
-        while self.server_running:
-            message = input(colored("Server: ", "yellow")).strip()
-            if message.lower() == 'exit':
-                self.server_running = False
-                break
-            self.broadcast(colored(f"Server: {message}", 'cyan'))
-
     def receive(self):
-        """Accept new client connections."""
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         try:
             server.bind((self.host, self.port))
             server.listen()
-            logging.info(f"🚀 Server running on {self.host}:{self.port}")
-            print(colored(f"🚀 Server running on {self.host}:{self.port}", 'cyan'))
-
-            threading.Thread(target=self.handle_server_input, daemon=True).start()
+            print(colored(f"🚀 StreamLine running on {self.host}:{self.port}", 'cyan'))
 
             while self.server_running:
                 client, address = server.accept()
                 logging.info(f"Connected with {str(address)}")
-                client.send('NICK'.encode('ascii'))
-                nickname = client.recv(1024).decode('ascii').strip()
+                nickname = client.recv(1024).decode('utf-8').strip()
 
                 if nickname in self.clients.values():
-                    client.send(colored("Nickname already in use. Disconnecting.", "red").encode('ascii'))
+                    client.send(colored("Nickname already in use.", "red").encode('utf-8'))
                     client.close()
                     continue
 
                 self.clients[client] = nickname
                 logging.info(f"New client joined: {nickname}")
-                self.broadcast(colored(f'{nickname} joined the chat!', 'green'))
+                print(colored(f'{nickname} joined StreamLine!', 'green'))
                 self.executor.submit(self.handle_client, client)
         except KeyboardInterrupt:
             logging.info("Server shutting down...")
             sys.exit(0)
-
 
 def run_server():
     print_banner()
