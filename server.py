@@ -2,6 +2,7 @@ import socket
 import sys
 import logging
 import threading
+import signal
 from concurrent.futures import ThreadPoolExecutor
 from utils import colored, print_banner, find_free_port, load_config
 
@@ -12,6 +13,7 @@ class ChatServer:
         self.clients = {}
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.server_running = True
+        self.lock = threading.Lock()
 
     def broadcast(self, message, exclude_client=None):
         for client, nickname in list(self.clients.items()):
@@ -22,9 +24,11 @@ class ChatServer:
                     logging.error(f"Error sending message to {nickname}: {e}")
                     self.remove_client(client)
 
+
     def remove_client(self, client):
-        if client in self.clients:
-            nickname = self.clients.pop(client)
+        with self.lock:
+            if client in self.clients:
+                nickname = self.clients.pop(client)
             client.close()
             self.broadcast(colored(f'{nickname} left StreamLine!', 'red'))
             logging.info(f"{nickname} disconnected.")
