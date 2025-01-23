@@ -1,4 +1,6 @@
 import logging
+import sys
+
 from utils import print_banner, colored
 from server import run_server
 from client import run_client

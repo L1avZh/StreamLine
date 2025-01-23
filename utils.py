@@ -13,16 +13,13 @@ class Colors:
     MAGENTA = '\033[95m'
     CYAN = '\033[96m'
 
+COLOR_MAP = {
+    'red': Colors.RED, 'green': Colors.GREEN, 'yellow': Colors.YELLOW,
+    'blue': Colors.BLUE, 'magenta': Colors.MAGENTA, 'cyan': Colors.CYAN
+}
 def colored(text, color):
-    color_map = {
-        'red': Colors.RED,
-        'green': Colors.GREEN,
-        'yellow': Colors.YELLOW,
-        'blue': Colors.BLUE,
-        'magenta': Colors.MAGENTA,
-        'cyan': Colors.CYAN
-    }
-    return f"{color_map.get(color, Colors.RESET)}{text}{Colors.RESET}"
+    return f"{COLOR_MAP.get(color, Colors.RESET)}{text}{Colors.RESET}"
+
 
 def print_banner():
     banner = [
