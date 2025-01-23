@@ -1,14 +1,6 @@
 # StreamLine Chat Application
 
-StreamLine is a terminal-based chat application that allows users to communicate over a network. The application can be run in both server and client modes, enabling public and local network chatting.
-
-## Features
-
-- **Two-way communication**: Server can participate in the chat alongside clients.
-- **Public Accessibility**: Run the server publicly with port forwarding or Ngrok.
-- **Colored Terminal Output**: Improved user experience with ANSI color codes.
-- **Automatic Port Selection**: If no port is provided, the server will choose an available one.
-- **Multi-threading**: Handles multiple clients efficiently.
+StreamLine is a terminal-based chat application that allows users to communicate over a network.
 
 ## Prerequisites
 
