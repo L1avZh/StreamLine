@@ -1,7 +1,3 @@
-Below is an updated version of your README that reflects recent changes—particularly the prompt to type `"server"` at startup and the loading animation before the server starts. If you’ve made additional changes to the client code (for example, integrating it into the same script or providing a separate `client.py`), feel free to adjust the instructions accordingly.
-
----
-
 # StreamLine Chat Application
 
 StreamLine is a terminal-based chat application that allows users to communicate over a network. You can run it in server mode to host a chat, and multiple clients can connect to it from local or public networks.
