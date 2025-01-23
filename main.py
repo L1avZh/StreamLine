@@ -1,9 +1,9 @@
 import logging
 import sys
 
-from utils import print_banner, colored
-from server import run_server
-from client import run_client
+from Utils.utils import print_banner, colored
+from Server.server import run_server
+from Client.client import run_client
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
