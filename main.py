@@ -2,7 +2,9 @@ import socket
 import threading
 import sys
 import random
-
+import json
+import logging
+from concurrent.futures import ThreadPoolExecutor
 
 # ANSI color codes
 class Colors:
@@ -13,7 +15,6 @@ class Colors:
     BLUE = '\033[94m'
     MAGENTA = '\033[95m'
     CYAN = '\033[96m'
-
 
 def colored(text, color):
     """Simulate colored output using ANSI escape codes."""
@@ -27,7 +28,6 @@ def colored(text, color):
     }
     return f"{color_map.get(color, Colors.RESET)}{text}{Colors.RESET}"
 
-
 def find_free_port():
     """Find an available port dynamically."""
     while True:
@@ -39,56 +39,65 @@ def find_free_port():
             except OSError:
                 continue
 
+def load_config(filename="config.json"):
+    """Load configuration from a JSON file."""
+    try:
+        with open(filename, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {'host': '127.0.0.1', 'port': None}
 
 def print_banner():
     """Print colorful ASCII art banner."""
     banner = [
         colored(r" ___ _                      _    _          ", "cyan"),
         colored(r"/ __| |_ _ _ ___ __ _ _ __ | |  (_)_ _  ___ ", "green"),
-        colored(r"\__ \  _| '_/ -_) _` | '  \| |__| | ' \/ -_)", "yellow"),
+        colored(r"\__ \  _| '_/ -_) _` | '  \| |__| | ' \\/ -_)", "yellow"),
         colored(r"|___/\__|_| \___\__,_|_|_|_|____|_|_||_\___|", "red"),
         colored("\n         -Made by L1avZh\n", "magenta")
     ]
     print("\n".join(banner))
 
-
 class ChatServer:
     def __init__(self, host='127.0.0.1', port=None):
         self.host = host
         self.port = port if port else find_free_port()
-        self.clients = []
-        self.nicknames = []
+        self.clients = {}
+        self.executor = ThreadPoolExecutor(max_workers=10)
 
-    def broadcast(self, message, _client=None):
+    def broadcast(self, message, exclude_client=None):
         """Send a message to all connected clients except the sender."""
-        for client in self.clients:
-            if client != _client:
+        for client, nickname in self.clients.items():
+            if client != exclude_client:
                 try:
                     client.send(message)
-                except:
+                except Exception as e:
+                    logging.error(f"Error sending message to {nickname}: {e}")
                     self.remove_client(client)
 
     def remove_client(self, client):
         """Remove a disconnected client from the server."""
         if client in self.clients:
-            index = self.clients.index(client)
-            self.clients.remove(client)
+            nickname = self.clients.pop(client)
             client.close()
-            nickname = self.nicknames[index]
-            self.nicknames.remove(nickname)
             leave_msg = colored(f'{nickname} left the chat!', 'red')
             self.broadcast(leave_msg.encode('ascii'))
+            logging.info(f"{nickname} has disconnected.")
 
     def handle_client(self, client):
         """Handle messages from a single client."""
+        nickname = self.clients[client]
         while True:
             try:
                 message = client.recv(1024)
-                colored_message = colored(message.decode('ascii'), 'green')
+                if not message:
+                    break
+                colored_message = colored(f"{nickname}: {message.decode('ascii')}", 'green')
                 self.broadcast(colored_message.encode('ascii'), client)
-            except:
-                self.remove_client(client)
+            except Exception as e:
+                logging.error(f"Error handling client {nickname}: {e}")
                 break
+        self.remove_client(client)
 
     def receive(self):
         """Accept new client connections."""
@@ -98,31 +107,35 @@ class ChatServer:
         try:
             server.bind((self.host, self.port))
             server.listen()
-            print(colored(f"Server is listening on {self.host}:{self.port}", 'blue'))
+            logging.info(f"Server listening on {self.host}:{self.port}")
         except Exception as e:
-            print(colored(f"Error starting server: {e}", 'red'))
+            logging.error(f"Error starting server: {e}")
             sys.exit(1)
 
-        while True:
-            try:
+        try:
+            while True:
                 client, address = server.accept()
-                print(colored(f"Connected with {str(address)}", 'green'))
+                logging.info(f"Connected with {str(address)}")
 
                 client.send('NICK'.encode('ascii'))
-                nickname = client.recv(1024).decode('ascii')
-                self.nicknames.append(nickname)
-                self.clients.append(client)
+                nickname = client.recv(1024).decode('ascii').strip()
+                if nickname in self.clients.values():
+                    client.send(colored("Nickname already in use. Disconnecting.", "red").encode('ascii'))
+                    client.close()
+                    continue
 
-                print(colored(f"Nickname of the client is {nickname}", 'yellow'))
+                self.clients[client] = nickname
+                logging.info(f"Nickname of the client is {nickname}")
                 join_msg = colored(f'{nickname} joined the chat!', 'green')
                 self.broadcast(join_msg.encode('ascii'))
                 client.send(colored(f'Connected to the server on port {self.port}!', 'cyan').encode('ascii'))
 
-                thread = threading.Thread(target=self.handle_client, args=(client,))
-                thread.start()
-            except Exception as e:
-                print(colored(f"Error accepting connection: {e}", 'red'))
-
+                self.executor.submit(self.handle_client, client)
+        except KeyboardInterrupt:
+            logging.info("Server shutting down...")
+            for client in list(self.clients.keys()):
+                self.remove_client(client)
+            sys.exit(0)
 
 class ChatClient:
     def __init__(self, host='127.0.0.1', port=None):
@@ -139,7 +152,8 @@ class ChatClient:
                     self.client.send(self.nickname.encode('ascii'))
                 else:
                     print(colored(message, 'cyan'))
-            except:
+            except Exception as e:
+                logging.error(f"Error receiving message: {e}")
                 print(colored("An error occurred! Disconnecting.", 'red'))
                 self.client.close()
                 break
@@ -147,8 +161,14 @@ class ChatClient:
     def write(self):
         """Send messages to the server."""
         while True:
-            message = f'{self.nickname}: {input(colored("→ ", "yellow"))}'
-            self.client.send(message.encode('ascii'))
+            try:
+                user_message = input(colored("\u2192 ", "yellow"))
+                message = f'{user_message}'
+                self.client.send(message.encode('ascii'))
+            except Exception as e:
+                logging.error(f"Error sending message: {e}")
+                self.client.close()
+                break
 
     def start(self, nickname, server_port):
         """Connect to the server and start communication."""
@@ -156,41 +176,50 @@ class ChatClient:
             self.nickname = nickname
             self.client.connect((self.host, server_port))
 
-            receive_thread = threading.Thread(target=self.receive)
+            receive_thread = threading.Thread(target=self.receive, daemon=True)
             receive_thread.start()
 
-            write_thread = threading.Thread(target=self.write)
-            write_thread.start()
-        except Exception as e:
-            print(colored(f"Connection error: {e}", 'red'))
+            self.write()
+        except ConnectionRefusedError:
+            print(colored("Unable to connect to the server. Check the port and try again.", 'red'))
             sys.exit(1)
-
+        except Exception as e:
+            logging.error(f"Connection error: {e}")
+            sys.exit(1)
 
 def run_server():
     """Start the chat server."""
     print_banner()
-    server = ChatServer()
-    print(colored(f"Server started on port {server.port}", 'blue'))
+    config = load_config()
+    server = ChatServer(host=config['host'], port=config['port'])
     server.receive()
-
 
 def run_client():
     """Start the chat client."""
     print_banner()
-    port = int(input(colored("Enter server port: ", 'yellow')))
-    client = ChatClient()
-    nickname = input(colored("Choose your nickname: ", 'yellow'))
-    client.start(nickname, port)
+    port = input(colored("Enter server port: ", 'yellow'))
+    try:
+        port = int(port)
+    except ValueError:
+        print(colored("Invalid port number. Please enter a valid integer.", 'red'))
+        sys.exit(1)
 
+    nickname = input(colored("Choose your nickname: ", 'yellow')).strip()
+    if not nickname:
+        print(colored("Nickname cannot be empty.", 'red'))
+        sys.exit(1)
+    client = ChatClient(port=port)
+    client.start(nickname, port)
 
 def main():
     """Main function to choose between server and client mode."""
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
     print_banner()
     print(colored("Choose mode:", 'cyan'))
     print(colored("1. Server", 'green'))
     print(colored("2. Client", 'green'))
 
-    choice = input(colored("Enter your choice (1/2): ", 'yellow'))
+    choice = input(colored("Enter your choice (1/2): ", 'yellow')).strip()
 
     if choice == '1':
         run_server()
@@ -199,7 +228,6 @@ def main():
     else:
         print(colored("Invalid choice. Exiting.", 'red'))
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
