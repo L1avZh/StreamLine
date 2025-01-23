@@ -1,19 +1,28 @@
 import json
-import ssl
-import random
 import socket
+import random
+import logging
+
+# ANSI color codes
+class Colors:
+    RESET = '\033[0m'
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
 
 def colored(text, color):
-    colors = {
-        'red': '\033[91m',
-        'green': '\033[92m',
-        'yellow': '\033[93m',
-        'blue': '\033[94m',
-        'magenta': '\033[95m',
-        'cyan': '\033[96m',
-        'reset': '\033[0m'
+    color_map = {
+        'red': Colors.RED,
+        'green': Colors.GREEN,
+        'yellow': Colors.YELLOW,
+        'blue': Colors.BLUE,
+        'magenta': Colors.MAGENTA,
+        'cyan': Colors.CYAN
     }
-    return f"{colors.get(color, colors['reset'])}{text}{colors['reset']}"
+    return f"{color_map.get(color, Colors.RESET)}{text}{Colors.RESET}"
 
 def print_banner():
     banner = [
@@ -21,31 +30,21 @@ def print_banner():
         colored(r"/ __| |_ _ _ ___ __ _ _ __ | |  (_)_ _  ___ ", "green"),
         colored(r"\__ \  _| '_/ -_) _` | '  \| |__| | ' \/ -_)", "yellow"),
         colored(r"|___/\__|_| \___\__,_|_|_|_|____|_|_||_\___|", "red"),
-        colored("\n         -Made by L1avZh\n", "magenta")
+        colored("\n         - Made by L1avZh\n", "magenta")
     ]
     print("\n".join(banner))
+
+def find_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
 
 def load_config(filename="config.json"):
     try:
         with open(filename, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {'host': '127.0.0.1', 'port': 5000}
-
-def secure_socket(sock):
-    try:
-        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        context.load_cert_chain(certfile="certs/cert.pem", keyfile="certs/key.pem")
-        return context.wrap_socket(sock, server_side=True)
-    except FileNotFoundError:
-        return sock
-
-def find_free_port():
-    while True:
-        port = random.randint(49152, 65535)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
-                s.bind(('', port))
-                return port
-            except OSError:
-                continue
+            config = json.load(f)
+            config['port'] = int(config.get('port') or find_free_port())
+            return config
+    except (FileNotFoundError, ValueError, json.JSONDecodeError):
+        logging.error("Config file not found or invalid. Using defaults.")
+        return {'host': '127.0.0.1', 'port': find_free_port()}
