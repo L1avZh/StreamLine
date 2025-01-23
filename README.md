@@ -24,16 +24,11 @@ Ensure you have the following installed on your system:
    cd StreamLine
    ```
 
-2. Install dependencies (if any):
-   ```bash
-   pip install -r requirements.txt
-   ```
-
 ## Usage
 
 ### Running the Server
 
-1. Start the server:
+1. Open a terminal and start the server:
    ```bash
    python main.py
    ```
@@ -42,7 +37,7 @@ Ensure you have the following installed on your system:
 
 ### Running the Client
 
-1. Start the client:
+1. Open another terminal and start the client:
    ```bash
    python main.py
    ```
@@ -111,5 +106,4 @@ Contributions are welcome! Feel free to fork the repository and submit a pull re
 ## License
 
 This project is licensed under the MIT License.
-
 

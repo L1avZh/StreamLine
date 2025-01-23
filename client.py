@@ -6,6 +6,12 @@ import json
 from utils import colored, print_banner, load_config
 
 
+def display_ui_banner():
+    print(colored("\n============================", 'magenta'))
+    print(colored("       StreamLine Chat      ", 'cyan'))
+    print(colored("============================\n", 'magenta'))
+
+
 class ChatClient:
     def __init__(self, host='127.0.0.1', port=None):
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -20,9 +26,9 @@ class ChatClient:
                 if message == 'NICK':
                     self.client.send(self.nickname.encode('utf-8'))
                 else:
-                    print(colored(f"\n{message}", 'cyan'))
+                    print(colored(f"{message}", 'cyan'))
             except ConnectionResetError:
-                print(colored("Server closed the connection.", 'red'))
+                print(colored("\nServer closed the connection.", 'red'))
                 self.running = False
                 break
             except Exception as e:
@@ -32,9 +38,9 @@ class ChatClient:
     def write(self):
         while self.running:
             try:
-                message = input(colored("\u2192 ", "yellow")).strip()
+                message = input(colored("\n\u2192", "yellow")).strip()
                 if message.lower() == '/exit':
-                    print(colored("Disconnecting...", 'red'))
+                    print(colored("\nDisconnecting...", 'red'))
                     self.running = False
                     self.client.close()
                     break
@@ -48,17 +54,17 @@ class ChatClient:
         self.nickname = nickname
         try:
             self.client.connect((self.host, self.port))
-            print(colored("Connected to the server! You can start chatting.", 'green'))
+            print(colored("\nConnected to the server! You can start chatting.", 'green'))
             self.client.send(self.nickname.encode('utf-8'))
             threading.Thread(target=self.receive, daemon=True).start()
             self.write()
         except ConnectionRefusedError:
-            print(colored("Unable to connect to the server.", 'red'))
+            print(colored("\nUnable to connect to the server.", 'red'))
             sys.exit(1)
 
 
 def run_client():
-    print_banner()
+    display_ui_banner()
     config = load_config()
 
     host = input(colored("Enter server IP (press Enter for localhost): ", 'yellow')).strip()
@@ -82,5 +88,5 @@ def run_client():
 
 
 if __name__ == "__main__":
-    print(colored("Welcome to the Chat App! Running server and client together.", 'cyan'))
+    print(colored("\nWelcome to StreamLine! Running server and client together.", 'cyan'))
     run_client()
