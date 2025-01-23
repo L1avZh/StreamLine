@@ -25,6 +25,7 @@ class Colors:
     BLUE = '\033[94m'
     MAGENTA = '\033[95m'
     CYAN = '\033[96m'
+    WHITE = '\033[97m'
 
 
 COLOR_MAP = {
@@ -33,7 +34,8 @@ COLOR_MAP = {
     'yellow': Colors.YELLOW,
     'blue': Colors.BLUE,
     'magenta': Colors.MAGENTA,
-    'cyan': Colors.CYAN
+    'cyan': Colors.CYAN,
+    'white': Colors.WHITE
 }
 
 
