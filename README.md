@@ -20,8 +20,8 @@ Ensure you have the following installed on your system:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/streamline-chat.git
-   cd streamline-chat
+   git clone https://github.com/L1avZh/StreamLine.git
+   cd StreamLine
    ```
 
 2. Install dependencies (if any):
