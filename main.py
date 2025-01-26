@@ -3,8 +3,10 @@
 import argparse
 import logging
 import sys
+import os
+import time
 
-from Utils.utils import print_banner, colored
+from Utils.utils import print_banner, colored, load_config, clear_screen, loading_animation
 from Server.server import run_server
 from Client.client import run_client
 
@@ -31,43 +33,37 @@ def main():
         datefmt='%H:%M:%S'
     )
 
+    config_file = 'config.json'
+    config = load_config(config_file)
+    
     args = parse_args()
-
-    # Print the banner in white/blue
-    print_banner()
+    
+    if not args.mode:
+        print_banner()
+        print(colored("Welcome to StreamLine!", 'cyan'))
+        print(colored("1. Run as Server", 'yellow'))
+        print(colored("2. Run as Client", 'yellow'))
+        choice = input(colored("Enter your choice (1/2): ", 'yellow')).strip()
+        if choice == '1':
+            args.mode = 'server'
+        elif choice == '2':
+            args.mode = 'client'
+        else:
+            print(colored("Invalid choice. Exiting.", 'red'))
+            sys.exit(1)
 
     try:
-        if args.mode is None:
-            # No CLI mode specified, prompt the user in bright colors
-            print(colored("Choose mode:", "white"))
-            print(colored("1. Server", "blue"))
-            print(colored("2. Client", "blue"))
-
-            choice = input(colored("Enter your choice (1/2): ", "yellow")).strip()
-            if choice == '1':
-                logging.info("Starting server mode...")
-                run_server()
-            elif choice == '2':
-                logging.info("Starting client mode...")
-                run_client()
-            else:
-                logging.error("Invalid choice provided.")
-                print(colored("Invalid choice. Exiting.", 'red'))
-                sys.exit(1)
-
+        clear_screen()
+        loading_animation("Starting StreamLine...")
+        if args.mode == 'server':
+            logging.info("Starting server mode...")
+            run_server()
+        elif args.mode == 'client':
+            logging.info("Starting client mode...")
+            run_client()
         else:
-            # A --mode argument was supplied
-            if args.mode == 'server':
-                logging.info("Starting server mode (CLI-based)...")
-                run_server()
-            elif args.mode == 'client':
-                logging.info("Starting client mode (CLI-based)...")
-                run_client()
-            else:
-                # Should never happen, but just in case
-                logging.error("Invalid mode argument.")
-                sys.exit(1)
-
+            logging.error("Invalid mode argument.")
+            sys.exit(1)
     except KeyboardInterrupt:
         logging.info("Interrupted by user, shutting down.")
         sys.exit(0)

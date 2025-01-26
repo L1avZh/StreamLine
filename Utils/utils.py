@@ -1,6 +1,9 @@
 import json
 import socket
 import logging
+import os
+import sys
+import time
 from pathlib import Path
 from typing import Dict
 
@@ -79,38 +82,55 @@ def find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def load_config(filename: str = "config.json") -> Dict[str, str]:
+def load_config(config_file):
     """
-    Loads and parses a JSON config file. If the file is not found or invalid,
-    logs an error and returns default config values.
-
-    :param filename: The path to the JSON config file (default 'config.json').
-    :return: A dictionary of configuration options. Keys: 'host' (str), 'port' (int).
+    Load configuration from a JSON file.
     """
-    config_path = Path(filename)
-    default_config = {'host': '127.0.0.1', 'port': find_free_port()}
-
-    if not config_path.exists():
-        logging.error(f"Config file '{filename}' not found. Using defaults.")
-        return default_config
-
     try:
-        with config_path.open('r', encoding='utf-8') as f:
-            config_data = json.load(f)
-
-        # Ensure 'host' and 'port' exist in final config
-        final_config = {
-            'host': config_data.get('host', default_config['host']),
-            'port': int(config_data.get('port', find_free_port()))
-        }
-        return final_config
-    except json.JSONDecodeError as e:
-        logging.error(f"Invalid JSON in config file '{filename}': {e}. Using defaults.")
-        return default_config
-    except ValueError as e:
-        logging.error(f"Error parsing config file '{filename}': {e}. Using defaults.")
-        return default_config
+        with open(config_file, 'r') as file:
+            config = json.load(file)
+            logging.info(f"Config loaded: {config}")
+            return config
+    except FileNotFoundError:
+        logging.error(f"Config file '{config_file}' not found.")
+    except json.JSONDecodeError:
+        logging.error(f"Error decoding JSON from config file '{config_file}'.")
     except Exception as e:
-        logging.error(f"Unexpected error reading config file '{filename}': {e}")
-        return default_config
+        logging.error(f"Unexpected error reading config file '{config_file}': {e}")
+    return {}
+
+
+def get_config_value(config, key, default=None):
+    """
+    Get a value from the config, returning a default if the key is not found or the value is None.
+    """
+    value = config.get(key, default)
+    if value is None:
+        logging.warning(f"Config key '{key}' is missing or None. Using default: {default}")
+        return default
+    return value
+
+
+def clear_screen():
+    """
+    Clears the terminal screen on Windows or Unix-based systems.
+    """
+    if os.name == 'nt':
+        os.system('cls')
+    else:
+        os.system('clear')
+
+
+def loading_animation(text="Loading..."):
+    """
+    Displays a short "spinner" animation in the terminal.
+    """
+    animation = ["|", "/", "-", "\\"]
+    for i in range(20):  # adjust for how long you want the animation to run
+        frame = animation[i % len(animation)]
+        sys.stdout.write(f"\r{frame} {text}")
+        sys.stdout.flush()
+        time.sleep(0.1)
+    sys.stdout.write("\r")  # move to the beginning of the line after animation finishes
+    sys.stdout.flush()
 
