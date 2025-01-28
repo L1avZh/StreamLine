@@ -1,3 +1,4 @@
+# Import necessary modules
 import json
 import socket
 import logging
@@ -14,7 +15,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 
-
+# Define ANSI color codes for styling text output in the terminal
 class Colors:
     """
     ANSI color code definitions for styling text output in the terminal.
@@ -30,7 +31,7 @@ class Colors:
     CYAN = '\033[96m'
     WHITE = '\033[97m'
 
-
+# Mapping of color names to ANSI codes
 COLOR_MAP = {
     'red': Colors.RED,
     'green': Colors.GREEN,
@@ -41,7 +42,7 @@ COLOR_MAP = {
     'white': Colors.WHITE
 }
 
-
+# Function to wrap text in ANSI color codes
 def colored(text: str, color: str) -> str:
     """
     Wrap the given text in ANSI color codes.
@@ -52,7 +53,7 @@ def colored(text: str, color: str) -> str:
     """
     return f"{COLOR_MAP.get(color, Colors.RESET)}{text}{Colors.RESET}"
 
-
+# Function to print the application's banner in colored ASCII art
 def print_banner() -> None:
     """
     Prints the application's banner in colored ASCII art.
@@ -70,7 +71,7 @@ def print_banner() -> None:
     for i, line in enumerate(banner_lines):
         print(colored(line, colors[i % len(colors)]))
 
-
+# Function to find and return a free ephemeral port
 def find_free_port() -> int:
     """
     Finds and returns a free ephemeral port by binding a socket to ('', 0).
@@ -81,7 +82,7 @@ def find_free_port() -> int:
         s.bind(('', 0))
         return s.getsockname()[1]
 
-
+# Function to load configuration from a JSON file
 def load_config(config_file):
     """
     Load configuration from a JSON file.
@@ -99,7 +100,7 @@ def load_config(config_file):
         logging.error(f"Unexpected error reading config file '{config_file}': {e}")
     return {}
 
-
+# Function to get a value from the config, returning a default if the key is not found or the value is None
 def get_config_value(config, key, default=None):
     """
     Get a value from the config, returning a default if the key is not found or the value is None.
@@ -110,7 +111,7 @@ def get_config_value(config, key, default=None):
         return default
     return value
 
-
+# Function to clear the terminal screen on Windows or Unix-based systems
 def clear_screen():
     """
     Clears the terminal screen on Windows or Unix-based systems.
@@ -120,7 +121,7 @@ def clear_screen():
     else:
         os.system('clear')
 
-
+# Function to display a short "spinner" animation in the terminal
 def loading_animation(text="Loading..."):
     """
     Displays a short "spinner" animation in the terminal.

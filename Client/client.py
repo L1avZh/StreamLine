@@ -1,3 +1,4 @@
+# Import necessary modules
 import socket
 import threading
 import sys
@@ -6,14 +7,17 @@ import os
 import time
 from Utils.utils import colored, load_config, get_config_value, clear_screen, loading_animation
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S"
 )
 
+# Define the ChatClient class
 class ChatClient:
     def __init__(self, host, port, nickname, password=None):
+        # Initialize the client with host, port, nickname, and optional password
         self.host = host
         self.port = port
         self.nickname = nickname
@@ -22,6 +26,7 @@ class ChatClient:
         self.running = True
 
     def start(self):
+        # Start the client and connect to the server
         try:
             self.client.connect((self.host, self.port))
             if self.password:
@@ -43,6 +48,7 @@ class ChatClient:
             sys.exit(1)
 
     def receive_messages(self):
+        # Receive messages from the server
         while self.running:
             try:
                 message = self.client.recv(1024).decode('utf-8')
@@ -54,6 +60,7 @@ class ChatClient:
                 break
 
     def send_messages(self):
+        # Send messages to the server
         while self.running:
             try:
                 message = input()
@@ -73,6 +80,7 @@ class ChatClient:
         self.close_connection()
 
     def close_connection(self):
+        # Close the connection to the server
         if self.running:
             self.running = False
             try:
@@ -82,7 +90,7 @@ class ChatClient:
             self.client.close()
             print(colored("Connection closed.", 'red'))
 
-
+# Function to run the client
 def run_client():
     config_file = 'config.json'
     config = load_config(config_file)
@@ -104,6 +112,7 @@ def run_client():
     client = ChatClient(host=host, port=port, nickname=nickname, password=password)
     client.start()
 
+# Main entry point of the script
 if __name__ == "__main__":
     clear_screen()
     loading_animation("Starting client...")

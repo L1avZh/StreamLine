@@ -1,3 +1,4 @@
+# Import necessary modules
 import json
 import socket
 import threading
@@ -5,14 +6,17 @@ import logging
 import os
 from Utils.utils import colored, print_banner, find_free_port, load_config, get_config_value, clear_screen, loading_animation
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S"
 )
 
+# List to keep track of connected clients
 clients = []
 
+# Function to broadcast messages to all clients except the sender
 def broadcast(message, sender_socket):
     for client in clients:
         if client != sender_socket:
@@ -23,6 +27,7 @@ def broadcast(message, sender_socket):
                 client.close()
                 clients.remove(client)
 
+# Function to handle communication with a connected client
 def handle_client(client_socket, server_password):
     if server_password:
         client_socket.send("Enter password: ".encode('utf-8'))
@@ -48,6 +53,7 @@ def handle_client(client_socket, server_password):
     client_socket.close()
     clients.remove(client_socket)
 
+# Function to run the server
 def run_server():
     config_file = 'config.json'
     config = load_config(config_file)
@@ -71,6 +77,7 @@ def run_server():
         logging.info(f"Accepted connection from {addr}")
         threading.Thread(target=handle_client, args=(client_socket, server_password)).start()
 
+# Main entry point of the script
 if __name__ == "__main__":
     clear_screen()
     loading_animation("Starting server...")
