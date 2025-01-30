@@ -19,8 +19,6 @@ logging.basicConfig(
 class Colors:
     """
     ANSI color code definitions for styling text output in the terminal.
-    If you need cross-platform compatibility (particularly older Windows CMD),
-    consider using `import colorama` and `colorama.init()`.
     """
     RESET = '\033[0m'
     RED = '\033[91m'
