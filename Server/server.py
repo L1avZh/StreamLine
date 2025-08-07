@@ -15,17 +15,21 @@ logging.basicConfig(
 
 # List to keep track of connected clients
 clients = []
+# Lock to synchronize access to the clients list
+clients_lock = threading.Lock()
 
 # Function to broadcast messages to all clients except the sender
 def broadcast(message, sender_socket):
-    for client in clients:
-        if client != sender_socket:
-            try:
-                client.send(message.encode('utf-8'))
-            except Exception as e:
-                logging.error(f"Error broadcasting message: {e}")
-                client.close()
-                clients.remove(client)
+    """Send a message to all connected clients except the sender."""
+    with clients_lock:
+        for client in clients[:]:
+            if client != sender_socket:
+                try:
+                    client.send(message.encode('utf-8'))
+                except Exception as e:
+                    logging.error(f"Error broadcasting message: {e}")
+                    client.close()
+                    clients.remove(client)
 
 # Function to handle communication with a connected client
 def handle_client(client_socket, server_password):
@@ -39,7 +43,8 @@ def handle_client(client_socket, server_password):
         else:
             client_socket.send("Password accepted. Welcome!".encode('utf-8'))
     
-    clients.append(client_socket)
+    with clients_lock:
+        clients.append(client_socket)
     while True:
         try:
             message = client_socket.recv(1024).decode('utf-8')
@@ -51,7 +56,9 @@ def handle_client(client_socket, server_password):
             logging.error(f"Error handling client: {e}")
             break
     client_socket.close()
-    clients.remove(client_socket)
+    with clients_lock:
+        if client_socket in clients:
+            clients.remove(client_socket)
 
 # Function to run the server
 def run_server():
