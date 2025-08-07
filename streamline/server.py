@@ -85,7 +85,11 @@ class ChatServer:
         self.logger.info("Server running on %s", addr)
         console.print(f"Server running on [bold]{addr}[/bold]")
         async with server:
-            await server.serve_forever()
+            try:
+                await server.serve_forever()
+            except asyncio.CancelledError:
+                self.logger.info("Server shutdown requested")
+                raise
 
 
 async def run_server(host: str, port: int, password: Optional[str], ssl_context: Optional[ssl.SSLContext]) -> None:
