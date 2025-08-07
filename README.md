@@ -55,7 +55,7 @@ Configuration is stored in `config.json`. An example:
 
 ## Contributing
 
-Contributions, suggestions, and bug reports are welcomed!  
+Contributions, suggestions, and bug reports are welcome!  
 - Fork the repository, create a feature branch, and submit a pull request.
 
 ## License
