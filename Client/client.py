@@ -29,7 +29,21 @@ class ChatClient:
         # Start the client and connect to the server
         try:
             self.client.connect((self.host, self.port))
-            if self.password:
+
+            # Handle optional server password handshake
+            self.client.settimeout(2)
+            try:
+                initial_msg = self.client.recv(1024).decode('utf-8')
+            except socket.timeout:
+                initial_msg = ''
+            finally:
+                self.client.settimeout(None)
+
+            if "Enter password" in initial_msg:
+                if not self.password:
+                    print(colored("Server requires a password. Disconnecting.", 'red'))
+                    self.client.close()
+                    sys.exit(1)
                 self.client.send(self.password.encode('utf-8'))
                 response = self.client.recv(1024).decode('utf-8')
                 if "Invalid password" in response:
@@ -38,6 +52,9 @@ class ChatClient:
                     sys.exit(1)
                 elif "Password accepted" in response:
                     print(colored(response, 'green'))
+            elif initial_msg:
+                # Display any initial message sent by the server
+                print(colored(initial_msg, 'green'))
             threading.Thread(target=self.receive_messages).start()
             self.send_messages()
         except ConnectionRefusedError:
