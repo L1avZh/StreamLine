@@ -1,66 +1,62 @@
-# StreamLine Chat Application
+# StreamLine
 
-StreamLine is a terminal-based chat application that allows users to communicate over a network. You can run it in server mode to host a chat, and multiple clients can connect to it from local or public networks.
+Modern asynchronous terminal chat application with optional authentication and TLS encryption.
 
+## Features
+
+- Asynchronous server and client built on `asyncio`
+- Colorful output powered by [`rich`](https://rich.readthedocs.io)
+- Command line interface using [`click`](https://click.palletsprojects.com)
+- Optional pre-shared password authentication
+- Optional TLS encryption using user supplied certificates
 
 ## Installation
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/L1avZh/StreamLine.git
-   cd StreamLine
-   ```
+```bash
+pip install -r requirements.txt  # if using a virtual environment
+```
+
+Rich and Click are required. They are lightweight and will be installed automatically when running the project inside this repository.
 
 ## Usage
 
+All commands are exposed through the module `streamline.cli`.
 
-![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExYXFpc20ydDE2Y3Vxc3d4d25kYWU4ZHRpeDFhNXIyeHkyMHRnNGdqaCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/GTRAA5xJOlUrsMd0QL/giphy.gif)
-
-
-### 1. Running the Server
-
-1. **Start the application**:
-   ```bash
-   python main.py
-   ```
-2. **At the prompt**, type `1` (then press Enter) to run in server mode.
-   ```
-   StreamLine running on 0.0.0.0:5000
-   ```
-
-### 2. Running a Client
+### Start the server
 
 ```bash
-   python main.py
-   ```
- 2. **At the prompt**, type `2` (then press Enter) to run in client mode.
- 
- 
-   * only clients can talk to each other
-  
-
-## Configuration
-
-Configuration is stored in `config.json`. An example:
-
-```json
-{
-    "host": "0.0.0.0",
-    "server_port": null
-}
+python -m streamline.cli server --password secret
 ```
-- **host**: Defaults to `0.0.0.0` for external connections; you can set it to `127.0.0.1` for local-only.
-- **server_port**: If set to `null`, a random free port is assigned. Otherwise, set a custom port number.
 
+Options:
 
-## Contributing
+- `--host` *(default: 0.0.0.0)* – interface to bind
+- `--port` – port to bind (defaults to a free port)
+- `--password` – optional password clients must supply
+- `--certfile`/`--keyfile` – enable TLS by providing certificate and key
 
-Contributions, suggestions, and bug reports are welcome!  
-- Fork the repository, create a feature branch, and submit a pull request.
+### Start a client
+
+```bash
+python -m streamline.cli client --nickname alice --host 127.0.0.1 --port 12345
+```
+
+Options:
+
+- `--nickname` – name shown with each message (prompted if omitted)
+- `--password` – password if the server requires one
+- `--use-ssl` – enable TLS; supply `--cafile` to verify server cert
+
+Type messages and press Enter to chat. Use `/exit` to disconnect.
+
+## Development
+
+Run the test suite with:
+
+```bash
+pytest
+```
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
+MIT
