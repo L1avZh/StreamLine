@@ -12,6 +12,8 @@ from .utils import (
     find_free_port,
     create_ssl_context,
     create_client_ssl_context,
+    load_config,
+    get_config_value,
     console,
 )
 
@@ -28,10 +30,14 @@ def cli() -> None:
 @click.option("--password", default=None, help="Pre-shared password for clients")
 @click.option("--certfile", type=click.Path(exists=True), default=None, help="TLS certificate file")
 @click.option("--keyfile", type=click.Path(exists=True), default=None, help="TLS private key file")
-def server(host: str, port: int | None, password: str | None, certfile: str | None, keyfile: str | None) -> None:
+@click.option("--config", type=click.Path(exists=True), default=None, help="Path to JSON config")
+def server(host: str, port: int | None, password: str | None, certfile: str | None, keyfile: str | None, config: str | None) -> None:
     """Run the StreamLine server."""
     print_banner()
-    port = port or find_free_port()
+    cfg = load_config(config) if config else {}
+    host = get_config_value(cfg, "host", host)
+    port = port or get_config_value(cfg, "server_port", find_free_port())
+    password = password or get_config_value(cfg, "server_password")
     ssl_context = create_ssl_context(certfile, keyfile)
     console.print(f"Starting server on {host}:{port}")
     asyncio.run(run_server(host, port, password, ssl_context))
@@ -44,9 +50,15 @@ def server(host: str, port: int | None, password: str | None, certfile: str | No
 @click.option("--password", default=None, help="Server password if required")
 @click.option("--cafile", type=click.Path(exists=True), default=None, help="CA file for TLS validation")
 @click.option("--use-ssl", is_flag=True, default=False, help="Enable TLS")
-def client(host: str, port: int, nickname: str, password: str | None, cafile: str | None, use_ssl: bool) -> None:
+@click.option("--config", type=click.Path(exists=True), default=None, help="Path to JSON config")
+def client(host: str, port: int, nickname: str, password: str | None, cafile: str | None, use_ssl: bool, config: str | None) -> None:
     """Run the StreamLine client."""
     print_banner()
+    cfg = load_config(config) if config else {}
+    host = get_config_value(cfg, "host", host)
+    port = get_config_value(cfg, "port", port)
+    nickname = get_config_value(cfg, "nickname", nickname)
+    password = password or get_config_value(cfg, "password")
     ssl_ctx = create_client_ssl_context(cafile) if use_ssl else None
     asyncio.run(run_client(host, port, nickname, password, ssl_ctx))
 
