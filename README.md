@@ -46,11 +46,11 @@ Configuration is stored in `config.json`. An example:
 ```json
 {
     "host": "0.0.0.0",
-    "port": null
+    "server_port": null
 }
 ```
 - **host**: Defaults to `0.0.0.0` for external connections; you can set it to `127.0.0.1` for local-only.
-- **port**: If set to `null`, a random free port is assigned. Otherwise, set a custom port number.
+- **server_port**: If set to `null`, a random free port is assigned. Otherwise, set a custom port number.
 
 
 ## Contributing
