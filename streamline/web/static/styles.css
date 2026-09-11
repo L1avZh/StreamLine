@@ -42,6 +42,13 @@ body {
   gap: 8px;
   font-weight: 600;
   letter-spacing: 0.2px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
 }
 
 .brand-mark {
@@ -49,10 +56,33 @@ body {
   font-family: var(--mono);
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .topbar-status {
   font-family: var(--mono);
   font-size: 13px;
   color: var(--text-dim);
+}
+
+.icon-button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--text);
+  border-color: var(--cyan);
 }
 
 #app {
@@ -197,7 +227,8 @@ label {
 input[type="text"],
 input[type="password"],
 input[type="number"],
-input:not([type]) {
+input:not([type]),
+select {
   width: 100%;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -245,6 +276,7 @@ input:focus {
   gap: 8px;
   font-size: 13px;
   font-weight: 400;
+  margin-bottom: 16px;
 }
 
 .checkbox-field input {
@@ -304,6 +336,12 @@ button.small {
 
 .error-text {
   color: var(--red);
+  font-size: 13px;
+  margin: 12px 0 0;
+}
+
+.saved-text {
+  color: var(--green);
   font-size: 13px;
   margin: 12px 0 0;
 }

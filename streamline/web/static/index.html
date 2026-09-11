@@ -8,11 +8,14 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
+    <button class="brand" data-nav="landing" aria-label="StreamLine home">
       <span class="brand-mark">&gt;_</span>
       <span class="brand-name">StreamLine</span>
+    </button>
+    <div class="topbar-right">
+      <span id="topbar-status" class="topbar-status"></span>
+      <button class="icon-button" data-nav="settings" aria-label="Settings" title="Settings">&#9881;</button>
     </div>
-    <div id="topbar-status" class="topbar-status"></div>
   </header>
 
   <main id="app">
@@ -30,6 +33,51 @@
         </button>
       </div>
       <p class="hint">Prefer the terminal? Everything here is also available via <code>streamline server</code> and <code>streamline client</code>.</p>
+    </section>
+
+    <!-- Settings -->
+    <section id="view-settings" class="view" hidden>
+      <button class="back-link" data-nav="landing">&larr; Back</button>
+      <h1>Settings</h1>
+
+      <form id="settings-form" class="panel">
+        <div class="field">
+          <label for="settings-nickname">Nickname</label>
+          <input id="settings-nickname" name="nickname" maxlength="32" pattern="[A-Za-z0-9_.\-]+" />
+          <p class="field-hint">Used to pre-fill the nickname field when joining a chat.</p>
+        </div>
+        <div class="field">
+          <label for="settings-default-interface">When I run <code>streamline</code> with no arguments</label>
+          <select id="settings-default-interface" name="default_interface">
+            <option value="ask">Ask me each time</option>
+            <option value="cli">Always use the command line</option>
+            <option value="web">Always open the web interface</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="settings-default-host">Default join host</label>
+            <input id="settings-default-host" name="default_host" />
+          </div>
+          <div class="field field-narrow">
+            <label for="settings-default-port">Default join port</label>
+            <input id="settings-default-port" name="default_port" type="number" min="1" max="65535" placeholder="none" />
+          </div>
+        </div>
+        <label class="checkbox-field">
+          <input id="settings-open-browser" name="web_open_browser" type="checkbox" />
+          Open a browser automatically when starting the web interface
+        </label>
+        <label class="checkbox-field">
+          <input id="settings-debug" name="log_level" type="checkbox" />
+          Verbose diagnostic logging (debug mode)
+        </label>
+        <button type="submit" class="primary">Save Settings</button>
+        <p id="settings-saved" class="saved-text" hidden>Saved.</p>
+        <p id="settings-error" class="error-text" hidden></p>
+      </form>
+
+      <p class="hint">Settings are stored on this machine, outside the application folder, and are shared with the CLI (<code>streamline settings show</code>).</p>
     </section>
 
     <!-- Host view -->

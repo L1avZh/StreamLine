@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ssl
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -12,6 +13,13 @@ import trustme
 from streamline import protocol
 from streamline.server import ChatServer
 from streamline.utils import find_free_port
+
+
+@pytest.fixture(autouse=True)
+def isolated_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Never touch the real user's StreamLine settings/logs while testing."""
+    monkeypatch.setenv("STREAMLINE_CONFIG_DIR", str(tmp_path / "config"))
+    yield tmp_path
 
 
 @pytest.fixture
