@@ -23,30 +23,38 @@ control — with password protection and TLS when you need them.
 - **Power-user CLI intact.** `streamline server` / `client` / `web` still work directly, with every
   flag, for scripting and automation.
 
-## Install
+## How to open StreamLine
 
-**Standalone executable** — no Python required. Download for your platform from the
-[latest release](https://github.com/L1avZh/StreamLine/releases/latest) and run it.
+StreamLine isn't a website or a desktop icon — it's a program you start from a terminal. If
+that's new to you, here's the whole process:
 
-**Homebrew** (macOS) — see [docs/installation.md](docs/installation.md) for setup status.
+### Step 1: Get the code and install it
 
-```bash
-brew install streamline
-```
-
-**Python** (developers, or anyone with Python 3.11+):
+Open a terminal (**Terminal** on macOS, **Terminal** on Linux, **PowerShell** or **Command
+Prompt** on Windows) and run:
 
 ```bash
-pip install streamline
+git clone https://github.com/L1avZh/StreamLine.git
+cd StreamLine
+pip install .
 ```
 
-Full details, including Windows/Linux notes: [docs/installation.md](docs/installation.md).
+This needs Python 3.11+ already on your computer (check with `python3 --version`). Don't have
+Python, or don't want to install anything? Use the **standalone download** instead — see
+[docs/installation.md](docs/installation.md) for the no-Python option and Homebrew.
 
-## Quick Start
+> **Don't run `pip install streamline`** — that name on PyPI belongs to a different, unrelated
+> project. Use the `git clone` steps above instead.
+
+### Step 2: Run it
+
+Same terminal, same folder:
 
 ```bash
 streamline
 ```
+
+You should see a boxed menu appear right there in the terminal:
 
 ```
 ╭─────────────── StreamLine ───────────────╮
@@ -60,10 +68,12 @@ streamline
 ╰──────────────────────────────────────────╯
 ```
 
-Pick **Web Interface** and your browser opens automatically to a page where you can host or join
-a chat. Pick **Command Line** and a couple of prompts get you straight into one. First time only,
-you'll also be asked for a nickname and a default — see
-[docs/getting-started.md](docs/getting-started.md).
+Type `1` and press Enter for the web interface (your browser opens automatically), or `2` for the
+terminal-only version. First time only, it'll also ask for a nickname — see
+[docs/getting-started.md](docs/getting-started.md) for what happens next.
+
+If `streamline` isn't found after `pip install .`, your terminal's `PATH` doesn't include Python's
+script folder — run `python3 -m streamline.cli` instead, which always works.
 
 ## Usage
 

@@ -41,12 +41,9 @@ brew install streamline
 
 ## Python package (PyPI)
 
-For developers, or anyone who already has Python 3.11+:
-
-```bash
-pip install streamline
-streamline
-```
+**Not published yet.** The name `streamline` on PyPI belongs to an unrelated project — publishing
+under a different name (e.g. `streamline-chat`) is tracked in
+[releases.md](releases.md#publishing-to-pypi). Until that's resolved, use **From source** below.
 
 ## From source
 

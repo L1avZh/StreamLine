@@ -54,6 +54,14 @@ an editable/dev install, and a release build should reflect exactly what `pip in
 
 ## Publishing to PyPI
 
+**Blocked on a naming collision.** The name `streamline` is already taken on PyPI by an unrelated
+project (unrelated history, currently at their own v1.1.1) — `pip install streamline` today
+installs *their* package, not this one. Before this project can publish, `pyproject.toml`'s
+`[project].name` needs to change to something available, e.g. `streamline-chat` — check
+`pip index versions <candidate-name>` returns nothing before picking one. The console command
+stays `streamline` either way (that's `[project.scripts]`, independent of the package name); only
+the `pip install <name>` part changes.
+
 Not automatic. `publish-to-pypi` in `release.yml` is a manually-triggered job
 (**Actions → Release → Run workflow**, tick "Also publish to PyPI") gated behind a `pypi`
 GitHub Environment, using [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
