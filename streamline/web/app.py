@@ -15,18 +15,21 @@ import logging
 import time
 from collections import deque
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__
+from .. import settings as settings_store
+from ..errors import describe_connection_error
 from ..events import ChatEvent
 from ..server import ChatServer
 from ..session import AuthenticationError, ChatSession
 from ..utils import create_client_ssl_context, find_free_port, validate_nickname
+from .security import is_local_origin
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,16 @@ HOST_EVENT_HISTORY = 100
 # the server starts listening; this is how long we wait before assuming a
 # background host task has started successfully.
 HOST_START_GRACE = 0.2
+
+
+def _require_local_origin(request: Request) -> None:
+    """Block cross-site requests from a page the user has open elsewhere.
+
+    See :mod:`streamline.web.security` for why this matters even though
+    the server only binds to localhost.
+    """
+    if not is_local_origin(request.headers.get("origin")):
+        raise HTTPException(403, "Cross-origin requests are not allowed.")
 
 
 @dataclass
@@ -115,6 +128,37 @@ class JoinRequest(BaseModel):
     use_ssl: bool = False
 
 
+class SettingsUpdate(BaseModel):
+    """All fields optional: only what's included in the request is changed."""
+
+    nickname: str | None = None
+    default_interface: str | None = None
+    default_host: str | None = None
+    default_port: int | None = None
+    connection_timeout: float | None = None
+    web_open_browser: bool | None = None
+    log_level: str | None = None
+
+
+def _apply_settings_update(update: SettingsUpdate) -> settings_store.Settings:
+    changes = update.model_dump(exclude_unset=True, exclude_none=True)
+    if "nickname" in changes and validate_nickname(changes["nickname"]) is None:
+        raise HTTPException(400, "Nickname must be 1-32 characters: letters, numbers, _ . -")
+    if "default_interface" in changes and changes["default_interface"] not in ("ask", "cli", "web"):
+        raise HTTPException(400, "default_interface must be 'ask', 'cli', or 'web'")
+    if "log_level" in changes and changes["log_level"] not in ("normal", "debug"):
+        raise HTTPException(400, "log_level must be 'normal' or 'debug'")
+    port = changes.get("default_port")
+    if port is not None and not (1 <= port <= 65535):
+        raise HTTPException(400, "default_port must be between 1 and 65535")
+
+    data = asdict(settings_store.load())
+    data.update(changes)
+    updated = settings_store.Settings(**data).validated()
+    settings_store.save(updated)
+    return updated
+
+
 def create_app() -> FastAPI:
     state = WebState()
 
@@ -130,8 +174,18 @@ def create_app() -> FastAPI:
     async def status() -> dict[str, object]:
         return {"version": __version__, **state.host_status()}
 
+    @app.get("/api/settings")
+    async def get_settings() -> dict[str, object]:
+        return asdict(settings_store.load())
+
+    @app.post("/api/settings")
+    async def update_settings(update: SettingsUpdate, request: Request) -> dict[str, object]:
+        _require_local_origin(request)
+        return asdict(_apply_settings_update(update))
+
     @app.post("/api/host/start")
-    async def host_start(req: HostStartRequest) -> dict[str, object]:
+    async def host_start(req: HostStartRequest, request: Request) -> dict[str, object]:
+        _require_local_origin(request)
         if state.host_session is not None:
             raise HTTPException(409, "Already hosting a chat. Stop it first.")
         port = req.port or find_free_port()
@@ -159,7 +213,8 @@ def create_app() -> FastAPI:
         return state.host_status()
 
     @app.post("/api/host/stop")
-    async def host_stop() -> dict[str, object]:
+    async def host_stop(request: Request) -> dict[str, object]:
+        _require_local_origin(request)
         await state.stop_host()
         return state.host_status()
 
@@ -169,6 +224,9 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws/host")
     async def ws_host(websocket: WebSocket) -> None:
+        if not is_local_origin(websocket.headers.get("origin")):
+            await websocket.close(code=1008)
+            return
         await websocket.accept()
         async with state.subscribe() as queue:
             for event in list(state.host_events):
@@ -182,6 +240,9 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws/join")
     async def ws_join(websocket: WebSocket) -> None:
+        if not is_local_origin(websocket.headers.get("origin")):
+            await websocket.close(code=1008)
+            return
         await websocket.accept()
         try:
             raw = await websocket.receive_json()
@@ -216,7 +277,7 @@ def create_app() -> FastAPI:
             return
         except (ConnectionError, OSError) as exc:
             await websocket.send_json(
-                {"kind": "error", "text": f"Could not connect to {req.host}:{req.port}: {exc}"}
+                {"kind": "error", "text": describe_connection_error(exc, req.host, req.port)}
             )
             await websocket.close()
             return

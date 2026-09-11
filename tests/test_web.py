@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
+from streamline import settings as settings_store
 from streamline.web.app import create_app
 
 
@@ -84,3 +86,66 @@ def test_join_websocket_reports_connection_error_for_unreachable_host():
         ws.send_json({"host": "127.0.0.1", "port": 1, "nickname": "alice"})
         data = ws.receive_json()
         assert data["kind"] == "error"
+
+
+def test_get_settings_returns_persisted_defaults():
+    with make_client() as client:
+        response = client.get("/api/settings")
+        assert response.status_code == 200
+        assert response.json()["nickname"] == "guest"
+
+
+def test_post_settings_persists_changes():
+    with make_client() as client:
+        response = client.post(
+            "/api/settings", json={"nickname": "alice", "web_open_browser": False}
+        )
+        assert response.status_code == 200
+        assert response.json()["nickname"] == "alice"
+        assert response.json()["web_open_browser"] is False
+
+        persisted = settings_store.load()
+        assert persisted.nickname == "alice"
+        assert persisted.web_open_browser is False
+
+
+def test_post_settings_rejects_invalid_nickname():
+    with make_client() as client:
+        response = client.post("/api/settings", json={"nickname": "not valid!!"})
+        assert response.status_code == 400
+
+
+def test_post_settings_rejects_invalid_default_interface():
+    with make_client() as client:
+        response = client.post("/api/settings", json={"default_interface": "carrier-pigeon"})
+        assert response.status_code == 400
+
+
+def test_mutating_requests_reject_foreign_origin():
+    with make_client() as client:
+        response = client.post(
+            "/api/host/start",
+            json={"host": "127.0.0.1", "port": None},
+            headers={"Origin": "https://evil.example"},
+        )
+        assert response.status_code == 403
+
+
+def test_mutating_requests_allow_localhost_origin():
+    with make_client() as client:
+        response = client.post(
+            "/api/host/start",
+            json={"host": "127.0.0.1", "port": None},
+            headers={"Origin": "http://127.0.0.1:8765"},
+        )
+        assert response.status_code == 200
+        client.post("/api/host/stop")
+
+
+def test_websocket_rejects_foreign_origin():
+    with make_client() as client:
+        try:
+            with client.websocket_connect("/ws/join", headers={"Origin": "https://evil.example"}):
+                raise AssertionError("connection should have been rejected")
+        except WebSocketDisconnect as exc:
+            assert exc.code == 1008

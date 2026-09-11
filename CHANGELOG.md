@@ -5,22 +5,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [3.0.0] - 2026-09-11
 
-Unified entry point, guided CLI, and a new local web interface.
+Unified entry point, guided CLI, a local web interface, a persistent settings system, and
+standalone/package-manager distribution. This is the target for the first public release — no
+prior version has been tagged, so everything below is one changelog entry, not a diff against a
+shipped release.
 
 ### Added
 
 - `streamline` with no arguments now shows an interactive menu to choose the CLI or the web
   interface, instead of requiring a subcommand up front.
+- A first-run wizard (default interface, nickname) that only runs once, followed by a polished
+  main menu: Web Interface / Command Line / Settings / Help / Exit.
 - A guided CLI flow (host vs. join, then a few prompts) for users who don't want to learn flags.
-- A local web interface (`streamline web`, or option 2 in the menu): host a chat or join one from
+- A local web interface (`streamline web`, or option 1 in the menu): host a chat or join one from
   the browser, with a live activity feed, online-user list, and inline error handling. Binds to
-  `127.0.0.1` by default and picks a free port automatically.
+  `127.0.0.1` by default and picks a free port automatically. Includes a Settings page.
+- A real persistent settings system (`streamline/settings.py`): nickname, default interface,
+  join defaults, web preferences, and log level, stored in the OS-appropriate per-user config
+  directory (never inside the install directory), with schema versioning/migration and
+  corrupted-file recovery. Editable from the CLI (`streamline settings show/set/reset`) or the
+  web Settings page — never by hand-editing JSON. Passwords are deliberately excluded from the
+  schema and never persisted.
 - `streamline/session.py`: a new presentation-agnostic `ChatSession` (connect, handshake,
   send/receive) that the terminal client and the web interface both wrap, so neither
   re-implements the wire protocol.
 - `streamline/events.py`: a shared `ChatEvent` type emitted by both `ChatServer` (join/leave/
   message activity) and `ChatSession`, letting the web interface show live status without
   polling.
+- `streamline/errors.py`: human-readable connection-error messages (shared by the CLI and web
+  interface) instead of raw exception text — no stack traces for expected failures like a
+  refused connection or a DNS lookup failure.
+- Quiet-by-default logging: the console only shows warnings/errors unless `--debug` (or
+  `STREAMLINE_DEBUG=1`) is set; full diagnostics always go to a per-user log file
+  (`streamline/paths.py`, via `platformdirs`).
+- Origin-checking on every mutating web API endpoint and WebSocket (`streamline/web/security.py`),
+  closing a cross-site WebSocket hijacking risk that would otherwise let a malicious page in
+  another browser tab drive the local server.
+- Standalone single-file executable builds via PyInstaller (`packaging/`,
+  `scripts/build_binary.py`), built and verified locally (macOS arm64) and via a new
+  `.github/workflows/release.yml` matrix (macOS arm64 + Intel, Windows, Linux) that attaches
+  artifacts to a draft GitHub Release on a version tag push.
+- A staging Homebrew formula (`Formula/streamline.rb`) that installs the standalone macOS binary
+  directly (avoids declaring FastAPI's dependency tree, including a compiled Rust extension in
+  `pydantic`, as fragile Homebrew resources), plus `scripts/update_homebrew_formula.py` to fill
+  in real checksums after a release.
+- `docs/` — installation, getting-started, configuration, security, CLI reference, development,
+  and release-process documentation, so the README could get short instead of exhaustive.
 
 ### Changed
 
@@ -30,7 +60,9 @@ Unified entry point, guided CLI, and a new local web interface.
 - `ChatServer` gained an optional `on_event` hook and an `install_signal_handlers` flag (off when
   hosted from inside the web interface's process, so it doesn't fight uvicorn for `SIGINT`/
   `SIGTERM`).
-- README rewritten to be shorter and scannable; the old wall-of-text version is gone.
+- Stdout/stderr are reconfigured to line-buffered on startup, so output appears promptly even
+  when redirected to a file — previously it could sit in a full buffer, looking like a hang.
+- README rewritten to be shorter and scannable; heavier material moved into `docs/`.
 
 ### Fixed
 
@@ -40,9 +72,11 @@ Unified entry point, guided CLI, and a new local web interface.
 
 ### Dependencies
 
-- Added `fastapi`, `uvicorn`, and `websockets` (runtime) for the web interface; `httpx` (dev) for
-  testing it. The CLI-only path (`streamline server` / `streamline client`) does not import any of
-  these until the web interface is actually requested, so plain CLI usage stays as fast as before.
+- Added `fastapi`, `uvicorn`, `websockets`, and `platformdirs` (runtime) for the web interface
+  and settings storage; `httpx` (dev) for testing the web layer; `pyinstaller`/`build`/`twine`
+  under a new `packaging` extra for building release artifacts. The CLI-only path
+  (`streamline server` / `streamline client`) does not import the web-only packages until the
+  web interface is actually requested, so plain CLI usage stays as fast as before.
 
 ## [2.0.0] - 2026-09-11
 

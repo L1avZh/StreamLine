@@ -8,12 +8,14 @@ import logging
 import re
 import socket
 import ssl
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 from rich.logging import RichHandler
 
+from .paths import log_file_path
 from .protocol import MAX_NICKNAME_LENGTH, MIN_NICKNAME_LENGTH
 
 console = Console()
@@ -62,13 +64,32 @@ def constant_time_equals(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
-def setup_logging(level: int = logging.INFO) -> None:
-    """Configure logging to use Rich's handler."""
+def setup_logging(debug: bool = False) -> None:
+    """Configure logging for a polished, non-technical console experience.
+
+    Full diagnostic logs (every connection, join/leave, etc.) always go to
+    the per-user log file (see :mod:`streamline.paths`) so a problem can be
+    investigated after the fact. The console only shows warnings and errors
+    by default — the curated ``console.print`` messages elsewhere are the
+    actual UI — unless *debug* is set, which raises the console to match.
+    """
+    file_handler = RotatingFileHandler(
+        log_file_path(), maxBytes=1_000_000, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+    )
+
+    console_handler = RichHandler(
+        rich_tracebacks=debug, show_path=debug, console=console, markup=False
+    )
+    console_handler.setLevel(logging.DEBUG if debug else logging.WARNING)
+
     logging.basicConfig(
-        level=level,
+        level=logging.DEBUG,
         format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True, console=console)],
+        handlers=[console_handler, file_handler],
         force=True,
     )
 

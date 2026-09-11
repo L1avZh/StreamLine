@@ -4,6 +4,7 @@ const views = {
   landing: document.getElementById("view-landing"),
   host: document.getElementById("view-host"),
   join: document.getElementById("view-join"),
+  settings: document.getElementById("view-settings"),
 };
 
 function showView(name) {
@@ -228,9 +229,80 @@ document.getElementById("join-disconnect").addEventListener("click", () => {
   resetJoinView();
 });
 
+/* ---------------- Settings ---------------- */
+
+const settingsForm = document.getElementById("settings-form");
+const settingsError = document.getElementById("settings-error");
+const settingsSaved = document.getElementById("settings-saved");
+let currentSettings = null;
+
+function applySettingsToForm(data) {
+  settingsForm.nickname.value = data.nickname;
+  settingsForm.default_interface.value = data.default_interface;
+  settingsForm.default_host.value = data.default_host;
+  settingsForm.default_port.value = data.default_port ?? "";
+  settingsForm.web_open_browser.checked = data.web_open_browser;
+  settingsForm.log_level.checked = data.log_level === "debug";
+}
+
+function applySettingsToJoinForm(data) {
+  const nicknameField = document.getElementById("join-nickname");
+  if (nicknameField.dataset.autofilled !== "false") {
+    nicknameField.value = data.nickname;
+    nicknameField.dataset.autofilled = "true";
+  }
+  if (data.default_host) document.getElementById("join-host").value = data.default_host;
+  if (data.default_port) document.getElementById("join-port").value = data.default_port;
+}
+
+// Once the user edits the nickname themselves, stop overwriting it when
+// settings are saved elsewhere (e.g. from the Settings page).
+document.getElementById("join-nickname").addEventListener("input", (event) => {
+  event.target.dataset.autofilled = "false";
+});
+
+async function loadSettings() {
+  const res = await fetch("/api/settings");
+  currentSettings = await res.json();
+  applySettingsToForm(currentSettings);
+  applySettingsToJoinForm(currentSettings);
+}
+
+settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  settingsError.hidden = true;
+  settingsSaved.hidden = true;
+  const fd = new FormData(settingsForm);
+  const port = fd.get("default_port");
+  const body = {
+    nickname: fd.get("nickname"),
+    default_interface: fd.get("default_interface"),
+    default_host: fd.get("default_host"),
+    default_port: port ? Number(port) : null,
+    web_open_browser: fd.get("web_open_browser") === "on",
+    log_level: fd.get("log_level") === "on" ? "debug" : "normal",
+  };
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Could not save settings.");
+    currentSettings = data;
+    applySettingsToJoinForm(data);
+    settingsSaved.hidden = false;
+  } catch (err) {
+    settingsError.textContent = err.message;
+    settingsError.hidden = false;
+  }
+});
+
 /* ---------------- Startup ---------------- */
 
 (async function init() {
+  await loadSettings();
   const res = await fetch("/api/status");
   const data = await res.json();
   if (data.hosting) {

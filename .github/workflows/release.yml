@@ -1,0 +1,101 @@
+name: Release
+
+# Triggered by pushing a version tag, e.g.:
+#   git tag v3.0.0 && git push origin v3.0.0
+# Builds the Python package (wheel + sdist) and a standalone executable
+# for each supported platform, then attaches all of them to a GitHub
+# Release. Publishing to PyPI is a separate, manually-triggered job (see
+# docs/releases.md) so a tag push alone never publishes anything externally.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      publish_to_pypi:
+        description: "Also publish to PyPI (requires Trusted Publishing to be configured)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-python-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/*
+          if-no-files-found: error
+
+  build-standalone:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: StreamLine-linux-x64
+          - os: windows-latest
+            asset_name: StreamLine-windows-x64.exe
+          - os: macos-14 # Apple Silicon
+            asset_name: StreamLine-macos-arm64
+          - os: macos-13 # Intel
+            asset_name: StreamLine-macos-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/build_binary.py
+
+      - name: Rename artifact (Unix)
+        if: runner.os != 'Windows'
+        run: mv dist/streamline "dist/${{ matrix.asset_name }}"
+      - name: Rename artifact (Windows)
+        if: runner.os == 'Windows'
+        run: move dist\streamline.exe "dist\${{ matrix.asset_name }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+          if-no-files-found: error
+
+  create-release:
+    needs: [build-python-package, build-standalone]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub Release with all artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          draft: true # review before publishing
+
+  publish-to-pypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_to_pypi
+    needs: [build-python-package]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # PyPI Trusted Publishing (OIDC) — no token/secret needed
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

@@ -12,6 +12,7 @@ import contextlib
 import logging
 import ssl
 
+from .errors import describe_connection_error
 from .events import ChatEvent
 from .session import AuthenticationError, ChatSession
 from .utils import console
@@ -55,8 +56,9 @@ class TerminalChatClient:
         try:
             await self.session.connect()
         except (ConnectionError, OSError, ssl.SSLError) as exc:
+            logger.info("Connection to %s:%s failed: %s", self.session.host, self.session.port, exc)
             console.print(
-                f"Could not connect to {self.session.host}:{self.session.port}: {exc}",
+                describe_connection_error(exc, self.session.host, self.session.port),
                 style="bold red",
             )
             return
@@ -76,8 +78,13 @@ class TerminalChatClient:
         try:
             await self._run_message_loops()
         except (ConnectionError, OSError) as exc:
-            logger.error("Connection error: %s", exc)
-            console.print(f"Connection error: {exc}", style="bold red")
+            logger.info(
+                "Connection to %s:%s dropped: %s", self.session.host, self.session.port, exc
+            )
+            console.print(
+                describe_connection_error(exc, self.session.host, self.session.port),
+                style="bold red",
+            )
         finally:
             await self.session.close()
             console.print("Connection closed", style="red")

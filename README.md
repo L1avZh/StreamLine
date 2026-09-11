@@ -1,59 +1,71 @@
 # StreamLine
 
-[![CI](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml/badge.svg)](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml)
+Private, self-hosted chat — one app, a terminal or a browser, no account required.
 
-Real-time chat over TCP, from your terminal or your browser.
+[![CI](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml/badge.svg)](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml)
 
 ## Why StreamLine?
 
-Spinning up a quick, private chat room shouldn't require a hosted service or an account. StreamLine
-is a single, self-contained app you run yourself — on your machine or a server you control — with
-password protection and TLS when you need them.
+Spinning up a quick, private chat room shouldn't require a hosted service, an account, or reading
+documentation first. StreamLine is a single app you run yourself — on your machine or a server you
+control — with password protection and TLS when you need them.
 
 ## Features
 
-- One command to start: pick CLI or web interface, nothing to configure up front
-- Real-time group chat over TCP, with optional password auth and TLS encryption
-- A local web interface for hosting or joining a chat visually — no separate frontend to install
-- A guided CLI for beginners, and direct flags/subcommands for scripting and power users
-- Server-owned identities: nicknames are validated and de-duplicated automatically
-- Hardened against oversized messages, terminal-escape injection, and unbounded connections
+- **One command to start.** `streamline` asks how you want to use it and takes it from there —
+  nothing to configure up front, nothing to install separately.
+- **Two ways in, one engine.** A guided terminal experience for the keyboard-first, a local web
+  interface for everyone else — both talk to the exact same chat engine, so neither one lags
+  behind the other.
+- **Real settings, not a config file to hand-edit.** Nickname, default interface, and connection
+  preferences persist automatically, editable from the CLI or the web UI.
+- **Private by default.** The web control panel binds to this machine only; nothing phones home.
+- **Power-user CLI intact.** `streamline server` / `client` / `web` still work directly, with every
+  flag, for scripting and automation.
+
+## Install
+
+**Standalone executable** — no Python required. Download for your platform from the
+[latest release](https://github.com/L1avZh/StreamLine/releases/latest) and run it.
+
+**Homebrew** (macOS) — see [docs/installation.md](docs/installation.md) for setup status.
+
+```bash
+brew install streamline
+```
+
+**Python** (developers, or anyone with Python 3.11+):
+
+```bash
+pip install streamline
+```
+
+Full details, including Windows/Linux notes: [docs/installation.md](docs/installation.md).
 
 ## Quick Start
 
 ```bash
-pip install -e ".[dev]"
 streamline
 ```
 
-You'll be asked how you want to use StreamLine:
-
 ```
-Choose how you want to continue:
-
-  1  Command Line Interface
-  2  Web Interface
+╭─────────────── StreamLine ───────────────╮
+│ Private. Simple. Connected.              │
+│                                          │
+│   1  Web Interface                       │
+│   2  Command Line                        │
+│   3  Settings                            │
+│   4  Help                                │
+│   5  Exit                                │
+╰──────────────────────────────────────────╯
 ```
 
-- **CLI** walks you through hosting or joining a chat with a few prompts.
-- **Web Interface** starts a local server, opens your browser, and shows you the URL.
-
-That's it — no separate frontend build, no manually starting a backend.
+Pick **Web Interface** and your browser opens automatically to a page where you can host or join
+a chat. Pick **Command Line** and a couple of prompts get you straight into one. First time only,
+you'll also be asked for a nickname and a default — see
+[docs/getting-started.md](docs/getting-started.md).
 
 ## Usage
-
-### CLI
-
-`streamline` with no arguments gives you a guided flow. If you already know what you want, skip the
-menu:
-
-```bash
-streamline server --password secret        # host a chat
-streamline client --nickname alice --host 127.0.0.1 --port 12345   # join one
-```
-
-Run `streamline server --help` / `streamline client --help` for the full set of options (TLS,
-config files, max clients, and more).
 
 ### Web Interface
 
@@ -61,51 +73,46 @@ config files, max clients, and more).
 streamline web
 ```
 
-This starts a local server, picks a free port automatically, opens your default browser, and prints
-the URL. From the page you can **host a chat** (start a room others can join) or **join a chat**
-(connect to a running StreamLine server) — both talk to the exact same chat engine the CLI uses.
+Starts a local server, picks a free port automatically, opens your browser, and prints the URL.
+Binds to `127.0.0.1` by default — see [Security](#security).
 
-The web interface binds to `127.0.0.1` (this machine only) by default. Pass `--host 0.0.0.0` only if
-you deliberately want it reachable from your network.
+### CLI
 
-## Configuration
-
-Server and client CLI commands accept `--config path/to/config.json` for defaults you don't want to
-retype:
-
-```json
-{
-  "host": "0.0.0.0",
-  "server_port": 54140,
-  "nickname": "guest"
-}
+```bash
+streamline server --password secret                                 # host a chat
+streamline client --nickname alice --host 127.0.0.1 --port 12345    # join one
 ```
 
-Any matching CLI flag overrides the config file. For TLS, generate a local development certificate
-with `./scripts/generate_dev_certs.sh` — see `streamline server --help` for how to use it.
+Full reference: [docs/cli.md](docs/cli.md).
 
 ## Architecture
 
-The CLI and the web interface are two thin front ends over the same core: connecting, authenticating,
-and sending/receiving chat messages all live in one place, so neither interface can drift out of sync
-with the other.
+The CLI and the web interface are two thin front ends over the same core — connecting,
+authenticating, and sending/receiving messages all live in one place, so neither interface can
+drift out of sync with the other. Details: [docs/development.md](docs/development.md).
 
 ```
         streamline
       (single entry point)
              │
      choose CLI or Web
-             │
       ┌──────┴──────┐
-      │             │
   Terminal CLI   Web Interface
   (Rich + Click) (FastAPI, local-only)
-      │             │
       └──────┬──────┘
-             │
       Shared chat core
    (ChatServer / ChatSession)
 ```
+
+## Security
+
+- The web control panel binds to `127.0.0.1` unless you explicitly opt into `--host 0.0.0.0`.
+- No password is required by default; anyone who can reach a hosted chat's port can join unless
+  you set one.
+- TLS is off by default — traffic (including the password) is plaintext until you enable it.
+- Passwords are never stored or logged.
+
+Details: [docs/security.md](docs/security.md).
 
 ## Development
 
@@ -116,15 +123,7 @@ mypy                             # type check
 pytest                           # test
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
-
-## Security
-
-- Without a password, anyone who can reach the port can join.
-- Without TLS, traffic (including the password) is sent in plaintext — use `--certfile`/`--keyfile`
-  (server) and `--use-ssl` (client) on any network you don't fully trust.
-- The web interface binds to `127.0.0.1` by default; exposing it further is an explicit choice, not
-  the default.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
 
 ## License
 
