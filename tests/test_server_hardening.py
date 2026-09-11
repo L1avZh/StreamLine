@@ -37,6 +37,26 @@ def _abrupt_rst_connection(port: int) -> None:
     sock.close()
 
 
+async def _wait_until_client_count(
+    server: ChatServer, expected: int, max_wait: float = 2.0
+) -> None:
+    """Poll ``server.clients`` until it reaches *expected* or time out.
+
+    The client side of the handshake gets its ``NICK_OK`` response — and
+    can return from ``do_handshake`` — a scheduling tick before the server
+    coroutine resumes past that same write to actually register the
+    client in ``self.clients``. Asserting the dict's size immediately
+    after ``do_handshake`` returns is a race, not a real bug — this is
+    the same defensive-polling pattern already used elsewhere in this
+    file (see ``test_rapid_connect_disconnect_cycles_leave_no_leaked_state``).
+    """
+    with contextlib.suppress(TimeoutError):
+        async with asyncio.timeout(max_wait):
+            while len(server.clients) != expected:  # noqa: ASYNC110 - no event to wait on
+                await asyncio.sleep(0.02)
+    assert len(server.clients) == expected
+
+
 @pytest.mark.parametrize(
     "nickname",
     [
@@ -91,7 +111,7 @@ async def test_client_disconnecting_immediately_after_connect_does_not_crash_ser
     reader2, writer2 = await asyncio.open_connection("127.0.0.1", port)
     nickname = await do_handshake(reader2, writer2, "alice")
     assert nickname == "alice"
-    assert len(server.clients) == 1
+    await _wait_until_client_count(server, 1)
     writer2.close()
     with contextlib.suppress(ConnectionError, OSError):
         await writer2.wait_closed()
@@ -135,7 +155,7 @@ async def test_abrupt_connection_reset_during_handshake_does_not_crash_server(ru
     # Server must still be fully healthy for a real client afterwards.
     reader, writer = await asyncio.open_connection("127.0.0.1", port)
     assert await do_handshake(reader, writer, "alice") == "alice"
-    assert len(server.clients) == 1
+    await _wait_until_client_count(server, 1)
     writer.close()
     with contextlib.suppress(ConnectionError, OSError):
         await writer.wait_closed()
@@ -233,7 +253,7 @@ async def test_fifty_concurrent_clients_all_connect_and_broadcast_reaches_everyo
             nickname = await do_handshake(reader, writer, f"user{i}")
             assert nickname == f"user{i}"
             conns.append((reader, writer))
-        assert len(server.clients) == n
+        await _wait_until_client_count(server, n)
 
         # Drain everyone's join-notice backlog before the broadcast test.
         for reader, _ in conns[:-1]:
