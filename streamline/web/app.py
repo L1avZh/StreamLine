@@ -155,7 +155,10 @@ def _apply_settings_update(update: SettingsUpdate) -> settings_store.Settings:
     data = asdict(settings_store.load())
     data.update(changes)
     updated = settings_store.Settings(**data).validated()
-    settings_store.save(updated)
+    try:
+        settings_store.save(updated)
+    except OSError as exc:
+        raise HTTPException(500, f"Could not save settings: {exc}") from exc
     return updated
 
 
@@ -286,7 +289,17 @@ def create_app() -> FastAPI:
         receive_task = asyncio.create_task(session.receive_forever())
         try:
             while True:
-                message = await websocket.receive_json()
+                try:
+                    message = await websocket.receive_json()
+                except ValueError:
+                    # Malformed JSON from the client (or, once decoded, not an
+                    # object at all). Not our peer's fault to worry the user
+                    # with — drop the one bad frame and keep the connection.
+                    logger.debug("Ignoring malformed WebSocket frame from client")
+                    continue
+                if not isinstance(message, dict):
+                    logger.debug("Ignoring non-object WebSocket message from client")
+                    continue
                 action = message.get("type")
                 if action == "send":
                     await session.send(str(message.get("text", "")))

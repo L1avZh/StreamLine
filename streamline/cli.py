@@ -109,9 +109,20 @@ def _first_run_wizard(current: Settings) -> Settings:
     updated = dataclasses.replace(
         current, default_interface=interface, nickname=nickname, first_run_complete=True
     )
-    settings_store.save(updated)
+    _save_settings_or_warn(updated)
     console.print("\nDone — you can change this anytime from [bold]Settings[/bold].\n", style="dim")
     return updated
+
+
+def _save_settings_or_warn(current: Settings) -> bool:
+    """Save settings; on failure (e.g. a read-only config directory), warn
+    instead of crashing — the user can keep using this session either way."""
+    try:
+        settings_store.save(current)
+        return True
+    except OSError as exc:
+        console.print(f"Warning: could not save settings ({exc}).", style="yellow")
+        return False
 
 
 def _main_menu(current: Settings) -> None:
@@ -215,8 +226,8 @@ def _settings_menu(current: Settings) -> Settings:
         elif choice == "6":
             if Confirm.ask("Reset all settings to defaults?", default=False):
                 current = Settings(first_run_complete=True)
-        settings_store.save(current)
-        console.print("Saved.\n", style="green")
+        if _save_settings_or_warn(current):
+            console.print("Saved.\n", style="green")
 
 
 def _print_help() -> None:
@@ -418,14 +429,20 @@ def settings_set(key: str, value: str) -> None:
         raise click.UsageError("Nickname must be 1-32 characters: letters, numbers, _ . -")
 
     updated = dataclasses.replace(current, **{key: coerced}).validated()
-    settings_store.save(updated)
+    try:
+        settings_store.save(updated)
+    except OSError as exc:
+        raise click.ClickException(f"Could not save settings: {exc}") from exc
     console.print(f"{key} = {getattr(updated, key)}", style="green")
 
 
 @settings_group.command("reset")
 def settings_reset() -> None:
     """Reset all settings to their defaults."""
-    settings_store.save(Settings(first_run_complete=True))
+    try:
+        settings_store.save(Settings(first_run_complete=True))
+    except OSError as exc:
+        raise click.ClickException(f"Could not save settings: {exc}") from exc
     console.print("Settings reset to defaults.", style="green")
 
 

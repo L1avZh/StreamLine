@@ -220,6 +220,16 @@ sendForm.addEventListener("submit", (event) => {
   sendInput.value = "";
 });
 
+// Belt-and-braces: don't rely solely on the browser's native
+// Enter-submits-the-form behavior for a chat input — explicitly submit on
+// Enter (without Shift, so Shift+Enter is free for a future multi-line box).
+sendInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    sendForm.requestSubmit();
+  }
+});
+
 document.getElementById("join-list").addEventListener("click", () => {
   joinSocket?.send(JSON.stringify({ type: "list" }));
 });
