@@ -32,8 +32,12 @@ def test_web_help():
     assert "web interface" in result.output.lower()
 
 
-def test_server_requires_certfile_and_keyfile_together():
-    result = CliRunner().invoke(cli, ["server", "--certfile", "/dev/null"])
+def test_server_requires_certfile_and_keyfile_together(tmp_path):
+    # A real temp file, not /dev/null: Click's `Path(exists=True)` check runs
+    # before our own validation, and /dev/null doesn't exist on Windows.
+    certfile = tmp_path / "cert.pem"
+    certfile.write_text("not a real certificate")
+    result = CliRunner().invoke(cli, ["server", "--certfile", str(certfile)])
     assert result.exit_code != 0
     assert "--certfile and --keyfile" in result.output
 
