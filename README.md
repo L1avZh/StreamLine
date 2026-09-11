@@ -1,31 +1,46 @@
 # StreamLine
 
-Modern asynchronous terminal chat application with optional authentication and TLS encryption.
+[![CI](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml/badge.svg)](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml)
+
+Modern asynchronous terminal chat application with optional password authentication and TLS encryption.
 
 ## Features
 
 - Asynchronous server and client built on `asyncio`
+- Server-owned identity: nicknames are validated and de-duplicated by the server, not trusted from clients
+- Join/leave notifications and a `/list` command to see who's online
 - Colorful output powered by [`rich`](https://rich.readthedocs.io)
 - Command line interface using [`click`](https://click.palletsprojects.com)
-- Optional pre-shared password authentication
-- Optional TLS encryption using user supplied certificates
+- Optional pre-shared password authentication (constant-time comparison)
+- Optional TLS encryption using user-supplied certificates
+- Hardened against oversized messages, terminal-escape injection, and unbounded client counts
+
+## Requirements
+
+Python 3.11 or newer.
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt  # if using a virtual environment
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"   # editable install with dev tooling (lint, type-check, tests)
 ```
 
-Rich and Click are required. They are lightweight and will be installed automatically when running the project inside this repository.
+Or, for just the runtime dependencies:
+
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
 
-All commands are exposed through the module `streamline.cli`.
+All commands are exposed through the `streamline` console script (or `python -m streamline.cli`).
 
 ### Start the server
 
 ```bash
-python -m streamline.cli server --password secret
+streamline server --password secret
 ```
 
 Options:
@@ -33,29 +48,51 @@ Options:
 - `--host` *(default: 0.0.0.0)* – interface to bind
 - `--port` – port to bind (defaults to a free port)
 - `--password` – optional password clients must supply
-- `--certfile`/`--keyfile` – enable TLS by providing certificate and key
+- `--certfile` / `--keyfile` – enable TLS by providing certificate and key (see [TLS](#tls))
+- `--max-clients` *(default: 200)* – maximum simultaneous connections
 - `--config` – load options from a JSON configuration file
 
 ### Start a client
 
 ```bash
-python -m streamline.cli client --nickname alice --host 127.0.0.1 --port 12345
+streamline client --nickname alice --host 127.0.0.1 --port 12345
 ```
 
 Options:
 
-- `--nickname` – name shown with each message (prompted if omitted)
+- `--nickname` – requested nickname (prompted if omitted; the server may rename you on collision)
 - `--password` – password if the server requires one
-- `--use-ssl` – enable TLS; supply `--cafile` to verify server cert
+- `--use-ssl` – enable TLS; supply `--cafile` to verify a self-signed server certificate
 - `--config` – load defaults from a JSON configuration file
 
-Type messages and press Enter to chat. Use `/exit` to disconnect.
+Type a message and press Enter to chat. Use `/exit` to disconnect, `/list` to see who's online.
+
+## TLS
+
+StreamLine never ships with TLS certificates or keys in the repository. Generate a throwaway
+self-signed certificate for local development with:
+
+```bash
+./scripts/generate_dev_certs.sh
+streamline server --certfile certs/cert.pem --keyfile certs/key.pem
+streamline client --use-ssl --cafile certs/cert.pem ...
+```
+
+For anything beyond local development, use a certificate from a real CA (or your internal PKI) and
+never commit private keys to version control.
+
+## Security notes
+
+- Without `--password`, anyone who can reach the port can join.
+- Without TLS, all traffic — including the password — is sent in plaintext. Use `--certfile`/`--keyfile`
+  (server) and `--use-ssl` (client) on any network you don't fully trust.
+- Messages are capped at 8 KiB and stripped of ANSI/control characters before being displayed or
+  relayed, to prevent terminal-injection and memory-exhaustion attacks from a malicious peer.
 
 ## Configuration
 
-Both client and server commands accept `--config` pointing to a JSON file. Values
-in the config act as defaults and can be overridden by CLI options. An example
-file:
+Both client and server commands accept `--config` pointing to a JSON file. Values in the config act
+as defaults and can be overridden by CLI options. Example:
 
 ```json
 {
@@ -68,14 +105,27 @@ file:
 }
 ```
 
-## Development
+## Docker
 
-Run the test suite with:
+The server (not the interactive client) can run in a container:
 
 ```bash
-pytest
+docker build -t streamline .
+docker run --rm -p 54140:54140 streamline
 ```
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+ruff check .              # lint
+ruff format .             # format
+mypy                       # type check
+pytest                    # test
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

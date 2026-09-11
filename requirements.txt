@@ -1,2 +1,2 @@
-rich
-click
+rich>=13.7,<15
+click>=8.1,<9

@@ -1,3 +1,28 @@
 .idea/
+.vscode/
 .DS_Store
 __pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Packaging
+*.egg-info/
+dist/
+build/
+
+# Test / tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# TLS material - never commit real certificates or keys
+certs/
+*.pem
+*.key
+*.crt
