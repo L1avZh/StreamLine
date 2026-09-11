@@ -2,129 +2,129 @@
 
 [![CI](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml/badge.svg)](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml)
 
-Modern asynchronous terminal chat application with optional password authentication and TLS encryption.
+Real-time chat over TCP, from your terminal or your browser.
+
+## Why StreamLine?
+
+Spinning up a quick, private chat room shouldn't require a hosted service or an account. StreamLine
+is a single, self-contained app you run yourself — on your machine or a server you control — with
+password protection and TLS when you need them.
 
 ## Features
 
-- Asynchronous server and client built on `asyncio`
-- Server-owned identity: nicknames are validated and de-duplicated by the server, not trusted from clients
-- Join/leave notifications and a `/list` command to see who's online
-- Colorful output powered by [`rich`](https://rich.readthedocs.io)
-- Command line interface using [`click`](https://click.palletsprojects.com)
-- Optional pre-shared password authentication (constant-time comparison)
-- Optional TLS encryption using user-supplied certificates
-- Hardened against oversized messages, terminal-escape injection, and unbounded client counts
+- One command to start: pick CLI or web interface, nothing to configure up front
+- Real-time group chat over TCP, with optional password auth and TLS encryption
+- A local web interface for hosting or joining a chat visually — no separate frontend to install
+- A guided CLI for beginners, and direct flags/subcommands for scripting and power users
+- Server-owned identities: nicknames are validated and de-duplicated automatically
+- Hardened against oversized messages, terminal-escape injection, and unbounded connections
 
-## Requirements
-
-Python 3.11 or newer.
-
-## Installation
+## Quick Start
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"   # editable install with dev tooling (lint, type-check, tests)
+pip install -e ".[dev]"
+streamline
 ```
 
-Or, for just the runtime dependencies:
+You'll be asked how you want to use StreamLine:
 
-```bash
-pip install -r requirements.txt
 ```
+Choose how you want to continue:
+
+  1  Command Line Interface
+  2  Web Interface
+```
+
+- **CLI** walks you through hosting or joining a chat with a few prompts.
+- **Web Interface** starts a local server, opens your browser, and shows you the URL.
+
+That's it — no separate frontend build, no manually starting a backend.
 
 ## Usage
 
-All commands are exposed through the `streamline` console script (or `python -m streamline.cli`).
+### CLI
 
-### Start the server
-
-```bash
-streamline server --password secret
-```
-
-Options:
-
-- `--host` *(default: 0.0.0.0)* – interface to bind
-- `--port` – port to bind (defaults to a free port)
-- `--password` – optional password clients must supply
-- `--certfile` / `--keyfile` – enable TLS by providing certificate and key (see [TLS](#tls))
-- `--max-clients` *(default: 200)* – maximum simultaneous connections
-- `--config` – load options from a JSON configuration file
-
-### Start a client
+`streamline` with no arguments gives you a guided flow. If you already know what you want, skip the
+menu:
 
 ```bash
-streamline client --nickname alice --host 127.0.0.1 --port 12345
+streamline server --password secret        # host a chat
+streamline client --nickname alice --host 127.0.0.1 --port 12345   # join one
 ```
 
-Options:
+Run `streamline server --help` / `streamline client --help` for the full set of options (TLS,
+config files, max clients, and more).
 
-- `--nickname` – requested nickname (prompted if omitted; the server may rename you on collision)
-- `--password` – password if the server requires one
-- `--use-ssl` – enable TLS; supply `--cafile` to verify a self-signed server certificate
-- `--config` – load defaults from a JSON configuration file
-
-Type a message and press Enter to chat. Use `/exit` to disconnect, `/list` to see who's online.
-
-## TLS
-
-StreamLine never ships with TLS certificates or keys in the repository. Generate a throwaway
-self-signed certificate for local development with:
+### Web Interface
 
 ```bash
-./scripts/generate_dev_certs.sh
-streamline server --certfile certs/cert.pem --keyfile certs/key.pem
-streamline client --use-ssl --cafile certs/cert.pem ...
+streamline web
 ```
 
-For anything beyond local development, use a certificate from a real CA (or your internal PKI) and
-never commit private keys to version control.
+This starts a local server, picks a free port automatically, opens your default browser, and prints
+the URL. From the page you can **host a chat** (start a room others can join) or **join a chat**
+(connect to a running StreamLine server) — both talk to the exact same chat engine the CLI uses.
 
-## Security notes
-
-- Without `--password`, anyone who can reach the port can join.
-- Without TLS, all traffic — including the password — is sent in plaintext. Use `--certfile`/`--keyfile`
-  (server) and `--use-ssl` (client) on any network you don't fully trust.
-- Messages are capped at 8 KiB and stripped of ANSI/control characters before being displayed or
-  relayed, to prevent terminal-injection and memory-exhaustion attacks from a malicious peer.
+The web interface binds to `127.0.0.1` (this machine only) by default. Pass `--host 0.0.0.0` only if
+you deliberately want it reachable from your network.
 
 ## Configuration
 
-Both client and server commands accept `--config` pointing to a JSON file. Values in the config act
-as defaults and can be overridden by CLI options. Example:
+Server and client CLI commands accept `--config path/to/config.json` for defaults you don't want to
+retype:
 
 ```json
 {
   "host": "0.0.0.0",
   "server_port": 54140,
-  "server_password": null,
-  "port": 12345,
-  "nickname": "guest",
-  "password": null
+  "nickname": "guest"
 }
 ```
 
-## Docker
+Any matching CLI flag overrides the config file. For TLS, generate a local development certificate
+with `./scripts/generate_dev_certs.sh` — see `streamline server --help` for how to use it.
 
-The server (not the interactive client) can run in a container:
+## Architecture
 
-```bash
-docker build -t streamline .
-docker run --rm -p 54140:54140 streamline
+The CLI and the web interface are two thin front ends over the same core: connecting, authenticating,
+and sending/receiving chat messages all live in one place, so neither interface can drift out of sync
+with the other.
+
+```
+        streamline
+      (single entry point)
+             │
+     choose CLI or Web
+             │
+      ┌──────┴──────┐
+      │             │
+  Terminal CLI   Web Interface
+  (Rich + Click) (FastAPI, local-only)
+      │             │
+      └──────┬──────┘
+             │
+      Shared chat core
+   (ChatServer / ChatSession)
 ```
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-ruff check .              # lint
-ruff format .             # format
-mypy                       # type check
-pytest                    # test
+ruff check . && ruff format .   # lint + format
+mypy                             # type check
+pytest                           # test
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
+
+## Security
+
+- Without a password, anyone who can reach the port can join.
+- Without TLS, traffic (including the password) is sent in plaintext — use `--certfile`/`--keyfile`
+  (server) and `--use-ssl` (client) on any network you don't fully trust.
+- The web interface binds to `127.0.0.1` by default; exposing it further is an explicit choice, not
+  the default.
 
 ## License
 

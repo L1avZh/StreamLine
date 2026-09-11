@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StreamLine</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&gt;_</span>
+      <span class="brand-name">StreamLine</span>
+    </div>
+    <div id="topbar-status" class="topbar-status"></div>
+  </header>
+
+  <main id="app">
+    <!-- Landing: choose Host or Join -->
+    <section id="view-landing" class="view">
+      <p class="lede">Real-time terminal chat — from your browser.</p>
+      <div class="choice-grid">
+        <button class="choice-card" data-nav="host">
+          <span class="choice-title">Host a Chat</span>
+          <span class="choice-desc">Start a room on this machine that others can join.</span>
+        </button>
+        <button class="choice-card" data-nav="join">
+          <span class="choice-title">Join a Chat</span>
+          <span class="choice-desc">Connect to a StreamLine server by address.</span>
+        </button>
+      </div>
+      <p class="hint">Prefer the terminal? Everything here is also available via <code>streamline server</code> and <code>streamline client</code>.</p>
+    </section>
+
+    <!-- Host view -->
+    <section id="view-host" class="view" hidden>
+      <button class="back-link" data-nav="landing">&larr; Back</button>
+      <h1>Host a Chat</h1>
+
+      <form id="host-form" class="panel">
+        <div class="field">
+          <label for="host-bind">Bind address</label>
+          <input id="host-bind" name="host" value="0.0.0.0" />
+          <p class="field-hint">0.0.0.0 accepts connections from your network. Use 127.0.0.1 to allow only this machine.</p>
+        </div>
+        <div class="field">
+          <label for="host-port">Port</label>
+          <input id="host-port" name="port" type="number" min="1" max="65535" placeholder="auto" />
+        </div>
+        <div class="field">
+          <label for="host-password">Password <span class="optional">(optional)</span></label>
+          <input id="host-password" name="password" type="password" autocomplete="new-password" />
+        </div>
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <div class="field">
+            <label for="host-max-clients">Max simultaneous clients</label>
+            <input id="host-max-clients" name="max_clients" type="number" min="1" max="10000" value="200" />
+          </div>
+        </details>
+        <button type="submit" class="primary">Start Hosting</button>
+        <p id="host-error" class="error-text" hidden></p>
+      </form>
+
+      <div id="host-active" class="panel" hidden>
+        <div class="status-row">
+          <span class="status-dot status-dot--live"></span>
+          <span id="host-address" class="mono"></span>
+          <button id="host-copy" class="ghost small" type="button">Copy</button>
+          <span class="spacer"></span>
+          <button id="host-stop" class="danger small" type="button">Stop Hosting</button>
+        </div>
+        <div class="host-columns">
+          <div>
+            <h2>Activity</h2>
+            <div id="host-log" class="log mono" aria-live="polite"></div>
+          </div>
+          <div>
+            <h2>Online (<span id="host-count">0</span>)</h2>
+            <ul id="host-users" class="user-list"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Join view -->
+    <section id="view-join" class="view" hidden>
+      <button class="back-link" data-nav="landing">&larr; Back</button>
+      <h1>Join a Chat</h1>
+
+      <form id="join-form" class="panel">
+        <div class="field-row">
+          <div class="field">
+            <label for="join-host">Host</label>
+            <input id="join-host" name="host" value="127.0.0.1" required />
+          </div>
+          <div class="field field-narrow">
+            <label for="join-port">Port</label>
+            <input id="join-port" name="port" type="number" min="1" max="65535" required />
+          </div>
+        </div>
+        <div class="field">
+          <label for="join-nickname">Nickname</label>
+          <input id="join-nickname" name="nickname" maxlength="32" pattern="[A-Za-z0-9_.\-]+" required />
+          <p class="field-hint">Letters, numbers, <code>_</code>, <code>.</code>, <code>-</code> — up to 32 characters.</p>
+        </div>
+        <div class="field">
+          <label for="join-password">Password <span class="optional">(if required)</span></label>
+          <input id="join-password" name="password" type="password" autocomplete="current-password" />
+        </div>
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <label class="checkbox-field">
+            <input id="join-tls" name="use_ssl" type="checkbox" />
+            Use TLS
+          </label>
+        </details>
+        <button type="submit" class="primary">Join</button>
+        <p id="join-error" class="error-text" hidden></p>
+      </form>
+
+      <div id="join-active" class="panel" hidden>
+        <div class="status-row">
+          <span id="join-status-dot" class="status-dot status-dot--live"></span>
+          <span id="join-status-text"></span>
+          <span class="spacer"></span>
+          <button id="join-list" class="ghost small" type="button">Who's online</button>
+          <button id="join-disconnect" class="danger small" type="button">Disconnect</button>
+        </div>
+        <div id="join-log" class="log log--chat mono" aria-live="polite"></div>
+        <form id="send-form" class="send-row">
+          <input id="send-input" autocomplete="off" placeholder="Type a message…" />
+          <button type="submit" class="primary small">Send</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
