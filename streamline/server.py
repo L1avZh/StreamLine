@@ -71,13 +71,14 @@ class ChatServer:
     async def _read_line(self, reader: StreamReader) -> str | None:
         """Read one line, enforcing the max line length.
 
-        Returns ``None`` on EOF or if the peer violated the protocol
-        (oversized line, invalid UTF-8), in which case the caller should
-        close the connection.
+        Returns ``None`` on EOF, a dropped/reset connection, or if the peer
+        violated the protocol (oversized line, invalid UTF-8) — any of
+        which mean the caller should treat the connection as over and
+        clean up, the same as a normal disconnect.
         """
         try:
             data = await reader.readline()
-        except (asyncio.LimitOverrunError, ValueError):
+        except (asyncio.LimitOverrunError, ValueError, ConnectionError, OSError):
             return None
         if not data:
             return None

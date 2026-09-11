@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import socket
+import struct
 
 import pytest
 
@@ -17,6 +19,22 @@ from streamline.server import ChatServer
 from streamline.utils import find_free_port
 
 from .conftest import do_handshake
+
+
+def _abrupt_rst_connection(port: int) -> None:
+    """Open a TCP connection to *port* and kill it with a real RST packet
+    (SO_LINGER with a zero timeout), not a graceful FIN close.
+
+    A plain ``writer.close()`` sends a FIN, which readline() sees as a
+    clean EOF — that path was already handled. A RST is what a client
+    crashing, a mobile network dropping, or a firewall resetting the
+    connection actually looks like on the wire, and it surfaces to the
+    reader as ``ConnectionResetError`` instead of EOF.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("127.0.0.1", port))
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+    sock.close()
 
 
 @pytest.mark.parametrize(
@@ -97,6 +115,48 @@ async def test_client_sending_garbage_bytes_before_handshake_does_not_crash_serv
     # Server must still work for the next client.
     reader2, writer2 = await asyncio.open_connection("127.0.0.1", port)
     assert await do_handshake(reader2, writer2, "alice") == "alice"
+    writer2.close()
+    with contextlib.suppress(ConnectionError, OSError):
+        await writer2.wait_closed()
+
+
+async def test_abrupt_connection_reset_during_handshake_does_not_crash_server(running_server):
+    """Regression test: ChatServer._read_line() only caught
+    LimitOverrunError/ValueError, not ConnectionError/OSError. A real RST
+    mid-handshake (as opposed to a graceful FIN) raised ConnectionResetError
+    out of readline(), which propagated all the way past handle_client as
+    an unhandled exception in client_connected_cb — skipping cleanup and
+    showing up as a scary error for a completely ordinary event (a client's
+    network dropping)."""
+    server, port = running_server
+    _abrupt_rst_connection(port)
+    await asyncio.sleep(0.3)
+
+    # Server must still be fully healthy for a real client afterwards.
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    assert await do_handshake(reader, writer, "alice") == "alice"
+    assert len(server.clients) == 1
+    writer.close()
+    with contextlib.suppress(ConnectionError, OSError):
+        await writer.wait_closed()
+
+
+async def test_abrupt_connection_reset_after_joining_does_not_crash_server(running_server):
+    server, port = running_server
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    await do_handshake(reader, writer, "alice")
+
+    # Simulate alice's network dropping mid-session: a real RST, not /exit.
+    sock = writer.get_extra_info("socket")
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+    writer.close()
+
+    await asyncio.sleep(0.3)
+    assert server.clients == {}, "the reset client must be cleaned up, not left as a ghost entry"
+
+    # Server must still be fully healthy for a new client afterwards.
+    reader2, writer2 = await asyncio.open_connection("127.0.0.1", port)
+    assert await do_handshake(reader2, writer2, "bob") == "bob"
     writer2.close()
     with contextlib.suppress(ConnectionError, OSError):
         await writer2.wait_closed()
