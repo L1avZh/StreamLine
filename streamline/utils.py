@@ -8,6 +8,7 @@ import logging
 import re
 import socket
 import ssl
+from collections.abc import Callable
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -64,34 +65,61 @@ def constant_time_equals(a: str, b: str) -> bool:
     return hmac.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
+def _open_rotating_file_handler(resolve_path: Callable[[], Path]) -> RotatingFileHandler | None:
+    """Try to open a rotating log file. Returns ``None`` on any OS-level failure.
+
+    *resolve_path* is a callable rather than a plain path because resolving
+    the real per-user log path can itself fail (creating the directory), and
+    that needs to be inside this same try/except.
+    """
+    try:
+        path = resolve_path()
+        return RotatingFileHandler(path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    except OSError:
+        return None
+
+
 def setup_logging(debug: bool = False) -> None:
     """Configure logging for a polished, non-technical console experience.
 
-    Full diagnostic logs (every connection, join/leave, etc.) always go to
+    Full diagnostic logs (every connection, join/leave, etc.) normally go to
     the per-user log file (see :mod:`streamline.paths`) so a problem can be
     investigated after the fact. The console only shows warnings and errors
     by default — the curated ``console.print`` messages elsewhere are the
     actual UI — unless *debug* is set, which raises the console to match.
+
+    If the per-user log location isn't writable (locked-down permissions,
+    a read-only filesystem, ...) this falls back to the system temp
+    directory, and finally to console-only logging, rather than crashing
+    every single command over something that isn't fatal to using the app.
     """
-    file_handler = RotatingFileHandler(
-        log_file_path(), maxBytes=1_000_000, backupCount=3, encoding="utf-8"
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
-    )
+    handlers: list[logging.Handler] = []
+
+    file_handler = _open_rotating_file_handler(log_file_path)
+    if file_handler is None:
+        import tempfile
+
+        file_handler = _open_rotating_file_handler(
+            lambda: Path(tempfile.gettempdir()) / "streamline.log"
+        )
+    if file_handler is not None:
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+        )
+        handlers.append(file_handler)
 
     console_handler = RichHandler(
         rich_tracebacks=debug, show_path=debug, console=console, markup=False
     )
     console_handler.setLevel(logging.DEBUG if debug else logging.WARNING)
+    handlers.append(console_handler)
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(message)s",
-        handlers=[console_handler, file_handler],
-        force=True,
-    )
+    logging.basicConfig(level=logging.DEBUG, format="%(message)s", handlers=handlers, force=True)
+    if file_handler is None:
+        logging.getLogger(__name__).warning(
+            "Could not open a log file (no writable location found); logging to console only."
+        )
 
 
 def print_banner() -> None:

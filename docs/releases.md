@@ -36,6 +36,14 @@ don't batch it up after the fact.
    needed, and publish it. It stays a draft until you do this deliberately — nothing goes out
    automatically on a tag push.
 
+**If a release run looks stuck:** GitHub's macOS runners — `macos-13` (Intel) in particular — can
+queue for a long time on the shared pool for public repos, sometimes over an hour, independent of
+StreamLine's own build (this has been observed in practice, not just theoretical). Each build job
+has a `timeout-minutes` bound once it actually starts running, but that doesn't cover queue time.
+If a run has been sitting with a job showing "in progress" for an unreasonable time and the log
+says "still in progress," check the run's queue status on GitHub directly, and cancel + re-run if
+needed — it's not a StreamLine bug, but it will make a release wait indefinitely if you let it.
+
 ## Building artifacts locally
 
 ```bash

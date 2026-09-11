@@ -23,6 +23,7 @@ permissions:
 jobs:
   build-python-package:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,6 +52,11 @@ jobs:
           - os: macos-13 # Intel
             asset_name: StreamLine-macos-x64
     runs-on: ${{ matrix.os }}
+    # Bounds actual build time once a runner picks the job up. It does NOT
+    # bound how long a job can sit queued waiting for a runner — macOS
+    # runners (especially macos-13/Intel) can queue for a long time on
+    # GitHub's shared pool; see docs/releases.md if a release run looks stuck.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -74,6 +80,7 @@ jobs:
   create-release:
     needs: [build-python-package, build-standalone]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -90,6 +97,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_to_pypi
     needs: [build-python-package]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: pypi
     permissions:
       id-token: write # PyPI Trusted Publishing (OIDC) — no token/secret needed

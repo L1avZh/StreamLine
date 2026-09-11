@@ -42,6 +42,45 @@ def test_server_requires_certfile_and_keyfile_together(tmp_path):
     assert "--certfile and --keyfile" in result.output
 
 
+def test_server_rejects_out_of_range_port_cleanly():
+    """Regression test: --port -1 used to crash with a raw OverflowError
+    traceback from deep inside asyncio.start_server()."""
+    for bad_port in ("-1", "0", "99999", "abc"):
+        result = CliRunner().invoke(cli, ["server", "--port", bad_port])
+        assert result.exit_code != 0
+        assert "Traceback" not in result.output
+
+
+def test_client_rejects_out_of_range_port_cleanly():
+    for bad_port in ("-1", "0", "99999", "abc"):
+        result = CliRunner().invoke(cli, ["client", "--port", bad_port, "--nickname", "alice"])
+        assert result.exit_code != 0
+        assert "Traceback" not in result.output
+
+
+def test_server_rejects_bad_port_from_config_file(tmp_path):
+    """--port validates via Click's IntRange, but a --config file's
+    server_port bypasses Click's option parsing entirely — this used to
+    reach asyncio.start_server() unvalidated and crash the same way."""
+    config_file = tmp_path / "config.json"
+    config_file.write_text('{"server_port": -5}')
+    result = CliRunner().invoke(cli, ["server", "--config", str(config_file)])
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "Invalid port" in result.output
+
+
+def test_client_rejects_bad_port_from_config_file(tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text('{"port": 999999}')
+    result = CliRunner().invoke(
+        cli, ["client", "--config", str(config_file), "--nickname", "alice"]
+    )
+    assert result.exit_code != 0
+    assert "Traceback" not in result.output
+    assert "Invalid port" in result.output
+
+
 def test_settings_show():
     settings_store.save(Settings(nickname="alice"))
     result = CliRunner().invoke(cli, ["settings", "show"])

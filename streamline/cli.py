@@ -109,9 +109,20 @@ def _first_run_wizard(current: Settings) -> Settings:
     updated = dataclasses.replace(
         current, default_interface=interface, nickname=nickname, first_run_complete=True
     )
-    settings_store.save(updated)
+    _save_settings_or_warn(updated)
     console.print("\nDone — you can change this anytime from [bold]Settings[/bold].\n", style="dim")
     return updated
+
+
+def _save_settings_or_warn(current: Settings) -> bool:
+    """Save settings; on failure (e.g. a read-only config directory), warn
+    instead of crashing — the user can keep using this session either way."""
+    try:
+        settings_store.save(current)
+        return True
+    except OSError as exc:
+        console.print(f"Warning: could not save settings ({exc}).", style="yellow")
+        return False
 
 
 def _main_menu(current: Settings) -> None:
@@ -215,8 +226,8 @@ def _settings_menu(current: Settings) -> Settings:
         elif choice == "6":
             if Confirm.ask("Reset all settings to defaults?", default=False):
                 current = Settings(first_run_complete=True)
-        settings_store.save(current)
-        console.print("Saved.\n", style="green")
+        if _save_settings_or_warn(current):
+            console.print("Saved.\n", style="green")
 
 
 def _print_help() -> None:
@@ -277,9 +288,28 @@ def _start_web(host: str, port: int | None, open_browser: bool) -> None:
     run_web(host=host, port=port or DEFAULT_PORT, open_browser=open_browser)
 
 
+def _validate_port(value: object) -> int:
+    """Validate a port sourced from a ``--config`` file.
+
+    Click's ``IntRange`` already validates ports passed directly as CLI
+    flags; a JSON config file bypasses that entirely, so a bad value there
+    (out of range, the wrong type, ...) would otherwise reach
+    ``asyncio.start_server``/``open_connection`` and crash with a raw
+    ``OverflowError`` or ``TypeError`` instead of a clean CLI error.
+    """
+    if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= 65535):
+        raise click.UsageError(f"Invalid port {value!r}: must be an integer from 1 to 65535.")
+    return value
+
+
 @cli.command()
 @click.option("--host", default="0.0.0.0", show_default=True, help="Host to bind")
-@click.option("--port", type=int, default=None, help="Port to bind (random free port if omitted)")
+@click.option(
+    "--port",
+    type=click.IntRange(1, 65535),
+    default=None,
+    help="Port to bind (random free port if omitted)",
+)
 @click.option("--password", default=None, help="Pre-shared password clients must supply")
 @click.option("--certfile", type=click.Path(exists=True), default=None, help="TLS certificate file")
 @click.option("--keyfile", type=click.Path(exists=True), default=None, help="TLS private key file")
@@ -302,7 +332,7 @@ def server(
     print_banner()
     cfg = load_config(config) if config else {}
     host = get_config_value(cfg, "host", host)
-    port = port or get_config_value(cfg, "server_port", find_free_port())
+    port = _validate_port(port or get_config_value(cfg, "server_port", find_free_port()))
     password = password or get_config_value(cfg, "server_password")
     if bool(certfile) != bool(keyfile):
         raise click.UsageError("--certfile and --keyfile must be provided together")
@@ -323,7 +353,9 @@ def server(
 
 @cli.command()
 @click.option("--host", default="127.0.0.1", show_default=True, help="Server host")
-@click.option("--port", type=int, default=12345, show_default=True, help="Server port")
+@click.option(
+    "--port", type=click.IntRange(1, 65535), default=12345, show_default=True, help="Server port"
+)
 @click.option("--nickname", prompt=True, help="Nickname to use")
 @click.option("--password", default=None, help="Server password if required")
 @click.option(
@@ -346,7 +378,7 @@ def client(
     print_banner()
     cfg = load_config(config) if config else {}
     host = get_config_value(cfg, "host", host)
-    port = get_config_value(cfg, "port", port)
+    port = _validate_port(get_config_value(cfg, "port", port))
     nickname = get_config_value(cfg, "nickname", nickname)
     password = password or get_config_value(cfg, "password")
     ssl_ctx = create_client_ssl_context(cafile) if use_ssl else None
@@ -360,7 +392,12 @@ def client(
     show_default=True,
     help="Interface to bind. Keep this local unless you intend to expose the web UI.",
 )
-@click.option("--port", type=int, default=None, help="Port to use (default: 8765, or next free)")
+@click.option(
+    "--port",
+    type=click.IntRange(1, 65535),
+    default=None,
+    help="Port to use (default: 8765, or next free)",
+)
 @click.option(
     "--no-browser", is_flag=True, default=False, help="Don't open a browser automatically"
 )
@@ -418,14 +455,20 @@ def settings_set(key: str, value: str) -> None:
         raise click.UsageError("Nickname must be 1-32 characters: letters, numbers, _ . -")
 
     updated = dataclasses.replace(current, **{key: coerced}).validated()
-    settings_store.save(updated)
+    try:
+        settings_store.save(updated)
+    except OSError as exc:
+        raise click.ClickException(f"Could not save settings: {exc}") from exc
     console.print(f"{key} = {getattr(updated, key)}", style="green")
 
 
 @settings_group.command("reset")
 def settings_reset() -> None:
     """Reset all settings to their defaults."""
-    settings_store.save(Settings(first_run_complete=True))
+    try:
+        settings_store.save(Settings(first_run_complete=True))
+    except OSError as exc:
+        raise click.ClickException(f"Could not save settings: {exc}") from exc
     console.print("Settings reset to defaults.", style="green")
 
 

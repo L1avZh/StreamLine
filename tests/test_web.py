@@ -149,3 +149,36 @@ def test_websocket_rejects_foreign_origin():
                 raise AssertionError("connection should have been rejected")
         except WebSocketDisconnect as exc:
             assert exc.code == 1008
+
+
+def test_join_websocket_survives_malformed_frames_without_crashing():
+    """Regression test: a bad frame used to raise an uncaught exception that
+    killed the connection with EndOfStream instead of being ignored."""
+    with make_client() as client:
+        start = client.post("/api/host/start", json={"host": "127.0.0.1", "port": None})
+        port = start.json()["port"]
+
+        with client.websocket_connect("/ws/join") as ws:
+            ws.send_json({"host": "127.0.0.1", "port": port, "nickname": "alice"})
+            assert ws.receive_json() == {"kind": "connected", "text": "alice"}
+
+            ws.send_text("this is not json at all {{{")
+            ws.send_json([1, 2, 3])
+            ws.send_json("just a string")
+            ws.send_json({"no_type_field": True})
+
+            with client.websocket_connect("/ws/join") as bob:
+                bob.send_json({"host": "127.0.0.1", "port": port, "nickname": "bob"})
+                assert bob.receive_json() == {"kind": "connected", "text": "bob"}
+                assert "bob joined" in ws.receive_json()["text"]  # alice sees bob join
+
+                # The connection must still be fully functional after the garbage.
+                ws.send_json({"type": "send", "text": "still alive after garbage"})
+                received = bob.receive_json()
+                assert received == {
+                    "kind": "chat",
+                    "text": "still alive after garbage",
+                    "sender": "alice",
+                }
+
+        client.post("/api/host/stop")
