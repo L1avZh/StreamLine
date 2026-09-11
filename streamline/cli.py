@@ -1,10 +1,18 @@
-"""Command line interface for StreamLine using Click."""
+"""Command line interface for StreamLine using Click.
+
+``streamline`` with no arguments drops into an interactive menu so a new
+user never has to learn a command up front. ``streamline server`` /
+``streamline client`` / ``streamline web`` remain available directly for
+scripting and for anyone who already knows what they want.
+"""
 
 from __future__ import annotations
 
 import asyncio
 
 import click
+from rich.panel import Panel
+from rich.prompt import IntPrompt, Prompt
 
 from . import __version__
 from .client import run_client
@@ -21,11 +29,72 @@ from .utils import (
 )
 
 
-@click.group()
+@click.group(invoke_without_command=True, no_args_is_help=False)
 @click.version_option(__version__, prog_name="streamline")
-def cli() -> None:
-    """StreamLine chat application."""
+@click.pass_context
+def cli(ctx: click.Context) -> None:
+    """StreamLine chat application.
+
+    Run with no arguments for an interactive menu, or use a subcommand
+    (`server`, `client`, `web`) directly.
+    """
     setup_logging()
+    if ctx.invoked_subcommand is None:
+        _interactive_start()
+
+
+def _interactive_start() -> None:
+    print_banner()
+    console.print(
+        Panel(
+            "[bold]Choose how you want to continue:[/bold]\n\n"
+            "  [cyan]1[/cyan]  Command Line Interface\n"
+            "  [cyan]2[/cyan]  Web Interface",
+            title="StreamLine",
+            border_style="cyan",
+            width=44,
+        )
+    )
+    choice = Prompt.ask("Select an option", choices=["1", "2"], default="1", show_choices=False)
+    console.print()
+    if choice == "1":
+        _guided_cli()
+    else:
+        _start_web(host="127.0.0.1", port=None, open_browser=True)
+
+
+def _guided_cli() -> None:
+    role = Prompt.ask(
+        "Do you want to [bold]host[/bold] a chat or [bold]join[/bold] one?",
+        choices=["host", "join"],
+        default="host",
+    )
+    console.print()
+    if role == "host":
+        host = Prompt.ask("Bind address", default="0.0.0.0")
+        port_raw = Prompt.ask("Port [dim](leave blank for automatic)[/dim]", default="")
+        password = Prompt.ask("Password [dim](leave blank for none)[/dim]", default="") or None
+        port = int(port_raw) if port_raw else find_free_port()
+        console.print(f"\nStarting server on {host}:{port}")
+        if password is None:
+            console.print(
+                "Warning: no password configured. Anyone who can reach this port can join.",
+                style="yellow",
+            )
+        asyncio.run(run_server(host, port, password, None, 200))
+    else:
+        host = Prompt.ask("Server host", default="127.0.0.1")
+        port = IntPrompt.ask("Server port")
+        nickname = Prompt.ask("Nickname")
+        password = Prompt.ask("Password [dim](leave blank if none)[/dim]", default="") or None
+        asyncio.run(run_client(host, port, nickname, password, None))
+
+
+def _start_web(host: str, port: int | None, open_browser: bool) -> None:
+    from .web import run_web
+    from .web.launcher import DEFAULT_PORT
+
+    run_web(host=host, port=port or DEFAULT_PORT, open_browser=open_browser)
 
 
 @cli.command()
@@ -49,7 +118,7 @@ def server(
     max_clients: int,
     config: str | None,
 ) -> None:
-    """Run the StreamLine server."""
+    """Run the StreamLine server directly (no menu)."""
     print_banner()
     cfg = load_config(config) if config else {}
     host = get_config_value(cfg, "host", host)
@@ -93,7 +162,7 @@ def client(
     use_ssl: bool,
     config: str | None,
 ) -> None:
-    """Run the StreamLine client."""
+    """Run the StreamLine client directly (no menu)."""
     print_banner()
     cfg = load_config(config) if config else {}
     host = get_config_value(cfg, "host", host)
@@ -102,6 +171,22 @@ def client(
     password = password or get_config_value(cfg, "password")
     ssl_ctx = create_client_ssl_context(cafile) if use_ssl else None
     asyncio.run(run_client(host, port, nickname, password, ssl_ctx))
+
+
+@cli.command()
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Interface to bind. Keep this local unless you intend to expose the web UI.",
+)
+@click.option("--port", type=int, default=None, help="Port to use (default: 8765, or next free)")
+@click.option(
+    "--no-browser", is_flag=True, default=False, help="Don't open a browser automatically"
+)
+def web(host: str, port: int | None, no_browser: bool) -> None:
+    """Start the StreamLine web interface directly (no menu)."""
+    _start_web(host=host, port=port, open_browser=not no_browser)
 
 
 if __name__ == "__main__":

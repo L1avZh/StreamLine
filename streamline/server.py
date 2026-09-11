@@ -11,6 +11,7 @@ from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass, field
 
 from . import protocol
+from .events import ChatEvent, OnEvent
 from .utils import console, constant_time_equals, sanitize_text, validate_nickname
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ class ChatServer:
         password: str | None = None,
         ssl_context: ssl.SSLContext | None = None,
         max_clients: int = 200,
+        on_event: OnEvent | None = None,
+        install_signal_handlers: bool = True,
     ) -> None:
         self.host = host
         self.port = port
@@ -49,6 +52,12 @@ class ChatServer:
         self.ssl_context = ssl_context
         self.max_clients = max_clients
         self.clients: dict[StreamWriter, ClientState] = {}
+        self._on_event = on_event
+        self._install_signal_handlers = install_signal_handlers
+
+    async def _emit(self, event: ChatEvent) -> None:
+        if self._on_event is not None:
+            await self._on_event(event)
 
     async def _write_line(self, writer: StreamWriter, line: str) -> bool:
         """Write *line* (plus newline) to *writer*. Returns False on failure."""
@@ -138,6 +147,7 @@ class ChatServer:
         self.clients[writer] = ClientState(writer=writer, nickname=nickname)
         logger.info("Client %s joined as %r", addr, nickname)
         await self.broadcast(f"{protocol.SYSTEM_PREFIX}{nickname} joined the chat", exclude=writer)
+        await self._emit(ChatEvent(kind="system", text=f"{nickname} joined the chat"))
 
         try:
             while True:
@@ -150,6 +160,7 @@ class ChatServer:
             await self._close(writer)
             logger.info("Client %s (%r) disconnected", addr, nickname)
             await self.broadcast(f"{protocol.SYSTEM_PREFIX}{nickname} left the chat")
+            await self._emit(ChatEvent(kind="system", text=f"{nickname} left the chat"))
 
     @staticmethod
     async def _close(writer: StreamWriter) -> None:
@@ -168,6 +179,7 @@ class ChatServer:
         if not text:
             return
         await self.broadcast(f"{nickname}: {text}", exclude=writer)
+        await self._emit(ChatEvent(kind="chat", text=text, sender=nickname))
 
     async def broadcast(self, message: str, exclude: StreamWriter | None = None) -> None:
         """Send *message* to all connected clients except *exclude*."""
@@ -188,9 +200,13 @@ class ChatServer:
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
         stop_event = asyncio.Event()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            with contextlib.suppress(NotImplementedError):
-                loop.add_signal_handler(sig, stop_event.set)
+        if self._install_signal_handlers:
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                # NotImplementedError: unsupported platform (e.g. Windows).
+                # ValueError: signal handlers can only be installed from
+                # the main thread of the main interpreter.
+                with contextlib.suppress(NotImplementedError, ValueError):
+                    loop.add_signal_handler(sig, stop_event.set)
 
         server = await asyncio.start_server(
             self.handle_client,

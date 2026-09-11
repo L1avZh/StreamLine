@@ -3,6 +3,47 @@
 All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.0] - 2026-09-11
+
+Unified entry point, guided CLI, and a new local web interface.
+
+### Added
+
+- `streamline` with no arguments now shows an interactive menu to choose the CLI or the web
+  interface, instead of requiring a subcommand up front.
+- A guided CLI flow (host vs. join, then a few prompts) for users who don't want to learn flags.
+- A local web interface (`streamline web`, or option 2 in the menu): host a chat or join one from
+  the browser, with a live activity feed, online-user list, and inline error handling. Binds to
+  `127.0.0.1` by default and picks a free port automatically.
+- `streamline/session.py`: a new presentation-agnostic `ChatSession` (connect, handshake,
+  send/receive) that the terminal client and the web interface both wrap, so neither
+  re-implements the wire protocol.
+- `streamline/events.py`: a shared `ChatEvent` type emitted by both `ChatServer` (join/leave/
+  message activity) and `ChatSession`, letting the web interface show live status without
+  polling.
+
+### Changed
+
+- `streamline/client.py` is now a thin terminal adapter (`TerminalChatClient`) over
+  `ChatSession`; behavior is unchanged, but the protocol logic it used to own now lives in one
+  shared place.
+- `ChatServer` gained an optional `on_event` hook and an `install_signal_handlers` flag (off when
+  hosted from inside the web interface's process, so it doesn't fight uvicorn for `SIGINT`/
+  `SIGTERM`).
+- README rewritten to be shorter and scannable; the old wall-of-text version is gone.
+
+### Fixed
+
+- `ChatServer.run()` only guarded `NotImplementedError` when installing signal handlers, but
+  installing them off the main thread raises `ValueError` — surfaced by embedding `ChatServer`
+  inside the web interface's test client. Both are now handled.
+
+### Dependencies
+
+- Added `fastapi`, `uvicorn`, and `websockets` (runtime) for the web interface; `httpx` (dev) for
+  testing it. The CLI-only path (`streamline server` / `streamline client`) does not import any of
+  these until the web interface is actually requested, so plain CLI usage stays as fast as before.
+
 ## [2.0.0] - 2026-09-11
 
 Full modernization and security hardening pass.
