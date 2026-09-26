@@ -4,6 +4,14 @@ Private, self-hosted chat — one app, a terminal or a browser, no account requi
 
 [![CI](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml/badge.svg)](https://github.com/L1avZh/StreamLine/actions/workflows/ci.yml)
 
+## Demo
+
+Same conversation, two front ends — a terminal client and a browser tab talking to the same room.
+
+| CLI | Web |
+| --- | --- |
+| ![StreamLine CLI demo](docs/assets/cli-demo.gif) | ![StreamLine web demo](docs/assets/web-demo.gif) |
+
 ## Why StreamLine?
 
 Spinning up a quick, private chat room shouldn't require a hosted service, an account, or reading
