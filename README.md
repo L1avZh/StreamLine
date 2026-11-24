@@ -142,6 +142,16 @@ pytest                           # test
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
 
+## Documentation
+
+- [Installation](docs/installation.md)
+- [Getting Started](docs/getting-started.md)
+- [CLI Reference](docs/cli.md)
+- [Configuration](docs/configuration.md)
+- [Security](docs/security.md)
+- [Development](docs/development.md)
+- [Releases](docs/releases.md)
+
 ## License
 
 MIT - see [LICENSE](LICENSE).
